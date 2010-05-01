@@ -1,0 +1,38 @@
+This is a version of l7-filter that works in userspace instead of the 
+kernel.  It is eventually intended to replace the kernel version since 
+running in userspace is much safer and more flexible.  However, it in 
+the early stages of development and NOT yet ready for prime time.
+
+Please see http://l7-filter.sf.net/HOWTO-userspace for more 
+documentation.
+
+*** Installation ***
+
+From ftp.netfilter.org or your distribution:
+install libnfnetlink
+install libnetfilter_queue
+install libnetfilter_conntrack
+
+Then run ./makeit.sh
+
+*** Running ***
+
+Make sure you have the ip_conntrack_netlink module loaded (or compiled 
+into your kernel): 
+modprobe ip_conntrack_netlink
+
+Run l7-filter:
+
+LD_LIBRARY_PATH=/usr/local/lib ./l7-filter configfile
+
+The LD_LIBRARY_PATH part may not be necessary for you.
+
+See sample-l7-filter.conf for the format of the config file.
+
+Send traffic to it:
+
+iptables -A FORWARD -j NFQUEUE --queue-num 0
+
+or 
+
+iptables -A FORWARD -j QUEUE

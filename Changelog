@@ -1,0 +1,4 @@
+v0.1 - 7 Dec 2006
+
+Initial release.  TCP and UDP mostly work. Initial UDP packets are 
+missed. Not a lot of features yet.
