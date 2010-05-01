@@ -1,3 +1,31 @@
+v0.3 - 25 Jan 2007
+
+Added man page.
+
+Added ./configure to check for libraries.
+
+Made patterns directory user selectable.
+
+Counts all packets now, not just those with application layer data.  I 
+think this is better because it avoids holding connections forever if 
+they keep sending empty packets.  On the other hand, now connections can 
+evade l7-filter by sending a bunch of empty packets at the beginning. 
+Perhaps a more complex approach may be necessary at some point.
+
+Made number of packets user selectable.  Defaults to 10 (not 8).
+
+Organized pattern file parsing code better.
+
+Made buffer length user selectable.  Made buffer dynamically allocated.  
+It is now only kept when needed instead of for the whole life of the 
+connection.  Buffer is dumped to the screen (if in verbose mode) when 
+(1) too many packets have passed without a match or (2) connection is 
+closed without a match.
+
+Now checks for ip_conntrack_netlink module.
+
+Various tweaks.
+
 v0.2 - 9 Jan 2007
 
 Makefile now has dependencies and stuff.

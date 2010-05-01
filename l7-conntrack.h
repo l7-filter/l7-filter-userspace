@@ -23,8 +23,6 @@
 
 class l7_connection {
  private:
-  const static int maxdatalen=8*1500;
-
   int num_packets;
   int mark;
 
@@ -32,7 +30,7 @@ class l7_connection {
   pthread_mutex_t buffer_mutex;
 
  public:
-  char buffer[8*1500];
+  char * buffer;
   int lengthsofar; // length of data in buffer, not counting terminating NULL
   string key;
   l7_connection();

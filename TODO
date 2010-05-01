@@ -1,13 +1,24 @@
-- Make child connections (FTP, IRC, etc.) work.
+For bringing this version up to speed with the kernel version and basic sanity:
 
-- Make selection of NO_MATCH and NO_MATCH_YET user friendly.
+- Make child connections (FTP, IRC, etc.) work.
 
 - Catch first packet of UDP "connections".
 
-- Use a more efficient scheme for finding connections.
+- Make install location configurable.
 
-- Check for required modules.
+- Are ^ and $ handled sensibly?  It seems so, yet the testing suite has 
+some sort of quirk about newlines.
 
-- Make sure that all errors/warnings are reported.
 
-- Much more?
+Easy nice things to add:
+
+- Allow configuration of what marks NO_MATCH and NO_MATCH_YET get.
+
+
+Things to work on after v1.0:
+
+- Use a more efficient scheme for matching packets with connections.
+
+- Make a mechanism for selecting non-default patterns, such as patterns 
+which are faster or more accurate than the default.
+

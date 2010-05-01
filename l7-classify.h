@@ -40,7 +40,7 @@ class l7_pattern {
   int hex2dec(char c);
 
  public:
-  l7_pattern(string name, string pattern_string, int eflags, int cflags, int mark);
+  l7_pattern(string name,string pattern_string,int eflags,int cflags,int mark);
   ~l7_pattern();
   bool matches(char * buffer);
   string getName();

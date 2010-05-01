@@ -1,0 +1,57 @@
+.TH l7-filter  "1" "January 2007" "l7-filter v0.3" "User's Manual"
+.SH NAME
+l7-filter \- classifies packets by their application layer data
+\fB
+.SH SYNOPSIS
+.B l7-filter 
+-f \fIconfiguration_file\fR [\fIoptions\fR]
+.SH DESCRIPTION
+.PP
+l7-filter reads packets that are queued by Netfilter/iptables and marks them 
+based on what application layer protocol they appear to be.
+.SH OPTIONS
+.TP
+.B -f \fIconfiguration_file\fR
+Mandatory option.  This file consists of pairs of protocol names and mark 
+numbers.
+.TP
+.B -q \fIqueue_number\fR
+What queue to read packets from.  Default is 0.
+.TP
+.B -b \fIbytes\fR
+Match on up to this many bytes of application layer data.  The default is
+12000.
+.TP
+.B -n \fIpackets\fR
+Examine up to this many packets in each connection.  If no match has been
+made after this, l7-filter gives up.  The number of packets counts all packets,
+including the TCP handshake and ACK packets (XXX but not any that l7-filter
+didn't manage to get the conntrack for in time XXX).
+.TP
+.B -p \fIpath\fR
+Look for patterns in \fIpath\fR instead of the default /etc/l7-protocols.
+The path and its subdirectories are searched, non-recursively 
+(subsubdirectories are not searched).
+.TP
+.B -s
+Be silent (don't print anything) except in the case of warnings or errors.
+.TP
+.B -v
+Be verbose.  Gives more information about what l7-filter is doing.  Multiple -v
+options increase the verbosity, up to a maximum of 4.
+.TP
+.B -d
+Allow inadvisable configurations.  You must give this option before the option
+which is inadvisable.
+.SH UPGRADES
+The latest version is always at http://sf.net/projects/l7-filter
+.SH "SEE ALSO"
+.BR iptables (1)
+.SH COPYRIGHT
+.PP
+Copyright \(co 2006-2007 Ethan Sommer <sommereAusers.sf.net> and Matthew 
+Strait <quadongAusers.sf.net>.  This is free software.  You may 
+redistribute copies of it under the terms of the GNU General Public 
+License <http://www.gnu.org/licenses/gpl.html>. There is NO WARRANTY, to 
+the extent permitted by law.
+

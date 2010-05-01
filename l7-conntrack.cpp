@@ -10,9 +10,6 @@
   as published by the Free Software Foundation; either version
   2 of the License, or (at your option) any later version.
   http://www.gnu.org/licenses/gpl.txt
-
-  Based on ctnl_test.c from libnetfilter-conntrack 0.0.31 (C) 2005 by 
-  Pablo Neira Ayuso <pablo@eurodev.net>
 */
 
 using namespace std;
@@ -36,11 +33,13 @@ extern "C" {
 #include "util.h"
 
 l7_classify* l7_classifier;
+unsigned int buflen; // Shouldn't really be global, but it's SO much easier
 
 l7_connection::l7_connection() 
 {
   pthread_mutex_init(&num_packets_mutex, NULL);
   pthread_mutex_init(&buffer_mutex, NULL);
+  buffer = (char *)malloc(buflen+1);
   lengthsofar = 0;
   num_packets = 0;
   mark = 0;
@@ -49,6 +48,11 @@ l7_connection::l7_connection()
 l7_connection::~l7_connection() 
 {
   //clean up stuff
+  if(buffer) 
+  {
+    print_give_up(key, (unsigned char *)buffer, lengthsofar);
+    free(buffer);
+  }
   pthread_mutex_destroy(&num_packets_mutex);
   pthread_mutex_destroy(&buffer_mutex);
 }
@@ -89,13 +93,13 @@ u_int32_t l7_connection::get_mark()
 
 void l7_connection::append_to_buffer(char *app_data, int appdatalen) 
 {
-  pthread_mutex_lock (&buffer_mutex);
+  pthread_mutex_lock(&buffer_mutex);
 
   int length = 0;
   int oldlength = lengthsofar;
 
   /* Strip nulls.  Add it to the end of the current data. */
-  for(int i = 0; i < maxdatalen-lengthsofar-1 && i < appdatalen; i++) {
+  for(int i = 0; i < buflen-lengthsofar && i < appdatalen; i++) {
     if(app_data[i] != '\0') {
       buffer[length+oldlength] = app_data[i];
       length++;
@@ -103,7 +107,7 @@ void l7_connection::append_to_buffer(char *app_data, int appdatalen)
   }
 
   buffer[length+oldlength] = '\0';
-  lengthsofar = length + lengthsofar;
+  lengthsofar += length;
   l7printf(3, "Appended data. Length so far = %d\n", lengthsofar);
 
   pthread_mutex_unlock (&buffer_mutex);
@@ -162,6 +166,7 @@ static int l7_handle_conntrack_event(void *arg, unsigned int flags, int type,
   if(type == NFCT_MSG_NEW){
     string key = make_key(ct, flags);
     if (l7_conntrack_handler->get_l7_connection(key)){
+      // this happens sometimes
       cerr << "Received NFCT_MSG_NEW but already have a connection. Packets = " 
            << l7_conntrack_handler->get_l7_connection(key)->get_num_packets() 
            << endl;
@@ -194,19 +199,7 @@ l7_conntrack::l7_conntrack(void* l7_classifier_in)
 {
   l7_classifier = (l7_classify *)l7_classifier_in;
   // Conntrack stuff
-//  unsigned long status = IPS_ASSURED | IPS_CONFIRMED;
-//  unsigned long timeout = 100;
-//  unsigned long mark = 0;
-//  unsigned long id = NFCT_ANY_ID;
   int ret = 0, errors = 0;
-  
-  // netfilter queue stuff
-//  struct nfq_handle *h;
-//  struct nfq_q_handle *qh;
-//  struct nfnl_handle *nh;
-//  int fd;
-//  int rv;
-//  char buf[4096];
   
   // Now open a handler that is subscribed to all possible events
   cth = nfct_open(CONNTRACK, NFCT_ALL_CT_GROUPS);
@@ -241,7 +234,7 @@ void l7_conntrack::start()
   int ret;
 
   nfct_register_callback(cth, l7_handle_conntrack_event, (void *)this);
-  ret = nfct_event_conntrack(cth);
+  ret = nfct_event_conntrack(cth); // this is the main loop
   
   nfct_close(cth);
   nfct_conntrack_free(ct);

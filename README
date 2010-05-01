@@ -3,37 +3,28 @@ kernel.  It is eventually intended to replace the kernel version since
 running in userspace is much safer and more flexible.  However, it in 
 the early stages of development and NOT yet ready for prime time.
 
-Please see http://l7-filter.sf.net/HOWTO-userspace for more 
-documentation.
+Full documentation is at http://l7-filter.sf.net/HOWTO-userspace 
+The rest of this file is an extremely abbreviated version of the HOWTO. 
+Please refer to the web version for a better guide.  Also see "man 
+l7-filter" after installing.
 
 *** Installation ***
 
-From ftp.netfilter.org or your Linux distribution:
-install libnfnetlink
-install libnetfilter_queue
-install libnetfilter_conntrack
-
-Then run "make" here.
+- Run "./configure" to check for dependencies.
+- Run "make".
+- Run "sudo make install" or similar.
 
 *** Running ***
 
-Make sure you have the ip_conntrack_netlink module loaded (or compiled 
-into your kernel): 
-
-modprobe ip_conntrack_netlink
-
-Run l7-filter:
+Make sure you have the ip_conntrack_netlink module loaded or compiled 
+into your kernel.  Run l7-filter:
 
 LD_LIBRARY_PATH=/usr/local/lib ./l7-filter -f configfile
 
-The LD_LIBRARY_PATH part may not be necessary for you.
-
-See sample-l7-filter.conf for the format of the config file.
-
-Send traffic to it:
+The LD_LIBRARY_PATH part may not be necessary for you.  See 
+sample-l7-filter.conf for the format of the config file. Send traffic to 
+it:
 
 iptables -A FORWARD -j NFQUEUE --queue-num 0
 
-or 
-
-iptables -A FORWARD -j QUEUE
+or similar.

@@ -20,14 +20,12 @@
 
 #include "l7-conntrack.h"
 
-#define L7_NUM_PACKETS 8
 #define NO_MATCH 65536
 #define NO_MATCH_YET NO_MATCH-1
 
 class l7_queue {
  private:
   l7_conntrack* l7_connection_tracker;
-  string friendly_print(unsigned char * s,int size);
   int app_data_offset(const unsigned char *data);
   string get_conntrack_key(const unsigned char *data, bool reverse);
 

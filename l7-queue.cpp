@@ -39,6 +39,9 @@ using namespace std;
 #include "l7-queue.h"
 #include "util.h"
 
+// Probably shouldn't really be global, but it's SO much easier
+int maxpackets = 10; // by default.
+
 extern "C" {
 #include <linux/netfilter.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
@@ -100,14 +103,15 @@ void l7_queue::start(int queuenum)
   nh = nfq_nfnlh(h);
   fd = nfnl_fd(nh);
 
-  while (true) {
+  // this is the main loop
+  while (true){
     while ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0)
       nfq_handle_packet(h, buf, rv);
     
-    cerr << "error recv returned negative value" << endl;
+    cerr << "Error: recv() returned negative value." << endl;
     cerr << "rv=" << rv << endl;
     cerr << "errno=" << errno << endl;
-    cerr << "errstr=" << strerror(errno) << endl;
+    cerr << "errstr=" << strerror(errno) << endl << endl;
   }
   l7printf(3, "unbinding from queue 0\n");
   nfq_destroy_queue(qh);
@@ -154,56 +158,66 @@ u_int32_t l7_queue::handle_packet(nfq_data * tb, struct nfq_q_handle *qh)
   dataoffset = app_data_offset((const unsigned char*)data);
   datalen = ret - dataoffset;
 
-  if(datalen > 0){
-    //find the conntrack 
-    string key = get_conntrack_key((const unsigned char*)data, false);
+  //find the conntrack 
+  string key = get_conntrack_key((const unsigned char*)data, false);
+  connection = l7_connection_tracker->get_l7_connection(key);
+  
+  if(connection)
+    l7printf(3, "Found connection orig:\t%s\n", key.c_str());
+  if(!connection){
+    //find the conntrack (backwards)
+    string key = get_conntrack_key((const unsigned char*)data, true);
     connection = l7_connection_tracker->get_l7_connection(key);
   
     if(connection)
-      l7printf(3, "Found connection orig:\t%s\n", key.c_str());
-    if(!connection){
-      //find the conntrack 
-      string key = get_conntrack_key((const unsigned char*)data, true);
-      connection = l7_connection_tracker->get_l7_connection(key);
+      l7printf(3, "Found connection reply:\t%s\n", key.c_str());
   
-      if(connection)
-        l7printf(3, "Found connection reply:\t%s\n", key.c_str());
-  
-      // It seems to routinely not get the UDP conntrack until the 2nd or 3rd
-      // packet.  Tested with DNS.
-      if(!connection)
-        l7printf(2, "Got packet, had no ct:\t%s\n", key.c_str());
-    }
+    // It seems to routinely not get the UDP conntrack until the 2nd or 3rd
+    // packet.  Tested with DNS.
+    if(!connection)
+      l7printf(2, "Got packet, had no ct:\t%s\n", key.c_str());
+  }
     
-    if(connection){
-      connection->increment_num_packets();
+  if(connection){
+    connection->increment_num_packets();
+  
+    if(datalen <= 0){
+      l7printf(3, "Connection with no new application data ignored.\n");
+      mark = NO_MATCH_YET; // no application data
+    }
+    else{
       if(connection->get_mark() != 0 && connection->get_mark() != NO_MATCH_YET){
+        // It is classified already.  Reapply existing mark.
         mark = connection->get_mark();
       }
-      else if(connection->get_num_packets() <= L7_NUM_PACKETS){
+      else if(connection->get_num_packets() <= maxpackets){
         connection->append_to_buffer((char*)(data+dataoffset),ret-dataoffset); 
         l7printf(3, "Packet number: %d\n", connection->get_num_packets());
         l7printf(3, "Data is: %s\n", 
-          friendly_print((unsigned char *)connection->buffer, connection->lengthsofar).c_str());
+          friendly_print((unsigned char *)connection->buffer,
+          connection->lengthsofar).c_str());
+          
         mark = connection->classify();
+        if(mark != NO_MATCH_YET){ // Got a match, no need to keep data
+          free(connection->buffer);
+          connection->buffer = NULL; // marks it not to be free'd again
+        }
       }
       else{
         mark = NO_MATCH; // Nothing matched before and we've given up
-        if(connection->get_num_packets() == L7_NUM_PACKETS+1){
-          l7printf(1, "Gave up on %s\n", key.c_str());
-          l7printf(2, "Data was: %s\n", 
-            friendly_print((unsigned char *)connection->buffer, connection->lengthsofar).c_str());
-        }
-      }
-    }
-    else{
-      l7printf(3, "No match yet for\t%s", key.c_str());
-      mark = NO_MATCH_YET;
-    }
-  }
+        if(connection->get_num_packets() == maxpackets+1){
+          print_give_up(key, (unsigned char *)connection->buffer, 
+                        connection->lengthsofar);
+        
+          free(connection->buffer);
+          connection->buffer = NULL; // marks it not to be free'd again
+        } // endif should dump data
+      } // endif whether should run match or what
+    } // endif there is any new data
+  } // endif we found the connection
   else{
-    l7printf(3, "Connection with no new application data ignored.\n");
-    mark = NO_MATCH_YET; // no application data
+    l7printf(3, "Didn't yet find\t%s", key.c_str());
+    mark = NO_MATCH_YET;
   }
 
   if(mark == 0){
@@ -224,30 +238,34 @@ string l7_queue::get_conntrack_key(const unsigned char *data, bool reverse)
 
   if(ip_protocol == IPPROTO_TCP){
     if(reverse){
-      snprintf(buf, 255, "tcp      6 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
+      snprintf(buf, 255, 
+              "tcp      6 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
 	      data[12], data[13], data[14], data[15],
 	      data[16], data[17], data[18], data[19],
-	      (data[ip_hl]*256+data[ip_hl+1]),(data[ip_hl+2]*256+data[ip_hl+3]));
+	      data[ip_hl]*256+data[ip_hl+1], data[ip_hl+2]*256+data[ip_hl+3]);
     }
     else{
-      snprintf(buf, 255, "tcp      6 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
+      snprintf(buf, 255, 
+              "tcp      6 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
 	      data[16], data[17], data[18], data[19],
 	      data[12], data[13], data[14], data[15],
-	      (data[ip_hl+2]*256+data[ip_hl+3]),(data[ip_hl]*256+data[ip_hl+1]));
+	      data[ip_hl+2]*256+data[ip_hl+3], data[ip_hl]*256+data[ip_hl+1]);
     }
   }
   else if(ip_protocol == IPPROTO_UDP){
     if(reverse){
-      snprintf(buf, 255, "udp      17 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
+      snprintf(buf, 255, 
+              "udp      17 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
 	      data[12], data[13], data[14], data[15],
 	      data[16], data[17], data[18], data[19],
-	      (data[ip_hl]*256+data[ip_hl+1]),(data[ip_hl+2]*256+data[ip_hl+3]));
+	      data[ip_hl]*256+data[ip_hl+1], data[ip_hl+2]*256+data[ip_hl+3]);
     }
     else{
-      snprintf(buf, 255, "udp      17 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
+      snprintf(buf, 255, 
+              "udp      17 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
 	      data[16], data[17], data[18], data[19],
 	      data[12], data[13], data[14], data[15],
-	      (data[ip_hl+2]*256+data[ip_hl+3]),(data[ip_hl]*256+data[ip_hl+1]));
+	      data[ip_hl+2]*256+data[ip_hl+3], data[ip_hl]*256+data[ip_hl+1]);
     }
   }
   else{
@@ -280,31 +298,6 @@ int l7_queue::app_data_offset(const unsigned char *data)
       l7printf(0, "Tried to get app data offset for unsupported protocol!\n");
       return ip_hl + 8; /* something reasonable */
   }
-}
-
-// Returns the data with non-printable characters replaced with dots.
-// If the input length is zero, returns NULL
-string l7_queue::friendly_print(unsigned char * s, int size)
-{
-  char * f = (char *)malloc(size + 1);
-  
-  int i;
-  if(size <= 0) return NULL;
-
-  if(!f){
-    cerr << "Out of memory in friendly_print, bailing.\n";
-    return NULL;
-  }
-  for(i = 0; i < size; i++){
-    if(isprint(s[i]) && s[i] < 128)     f[i] = s[i];
-    else if(isspace(s[i]))              f[i] = ' ';
-    else                                f[i] = '.';
-  }
-  f[i] = '\0';
-
-  string answer = f;
-  free(f);
-  return answer;
 }
 
 static int l7_queue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,

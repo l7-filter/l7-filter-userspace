@@ -1,5 +1,5 @@
 /*
-  Functions and classes which keep track of and use regexes to classify streams 
+  Functions and classes which keep track of and use regexes to classify streams
   of application data.
   
   By Ethan Sommer <sommere@users.sf.net> and Matthew Strait 
@@ -30,11 +30,11 @@ using namespace std;
 #define MAX_SUBDIRS 128
 #define MAX_FN_LEN 256
 
-// Not implemented yet
-//static char l7dir[MAX_FN_LEN] = "\0";
+string l7dir = "/etc/l7-protocols";
 
 #include "l7-classify.h"
 #include "l7-queue.h"
+#include "l7-parse-patterns.h"
 #include "util.h"
 
 l7_pattern::l7_pattern(string name, string pattern_string, int eflags, 
@@ -76,35 +76,38 @@ char * l7_pattern::pre_process(const char * s)
   char * result = (char *)malloc(strlen(s) + 1);
   int sindex = 0, rindex = 0;
   while( sindex < strlen(s) ) {
-    if( sindex + 3 < strlen(s) &&
-	s[sindex] == '\\' && s[sindex+1] == 'x' && 
-	isxdigit(s[sindex + 2]) && isxdigit(s[sindex + 3]) ) {
+    if( sindex + 3 < strlen(s) && s[sindex] == '\\' && s[sindex+1] == 'x' && 
+	isxdigit(s[sindex + 2]) && isxdigit(s[sindex + 3]) ){
+
       result[rindex] = hex2dec(s[sindex + 2])*16 + hex2dec(s[sindex + 3]);
 
       switch ( result[rindex] ) {
-      case 0x24:
-      case 0x28:
-      case 0x29:
-      case 0x2a:
-      case 0x2b:
-      case 0x2e:
-      case 0x3f:
-      case 0x5b:
-      case 0x5c:
-      case 0x5e:
-      case 0x7c:
-        cerr << "Warning: regexp contains a regexp control character, "
-             << result[rindex] << ", in hex (\\x" 
-             << s[sindex + 2] << s[sindex+3] << ".\n"
-	     << "I recommend that you write this as " << result[rindex] 
-             << " or \\" << result[rindex] << " depending on what you meant.\n";
-	break;
-      case 0x00:
-	cerr << "Warning: null (\\x00) in layer7 regexp. "
-             << "A null terminates the regexp string!\n";
-	break;
-      default:
-	break;
+        case '$':
+        case '(':
+        case ')':
+        case '*':
+        case '+':
+        case '.':
+        case '?':
+        case '[':
+        case ']':
+        case '^':
+        case '|':
+        case '{':
+        case '}':
+        case '\\':
+          cerr << "Warning: regexp contains a regexp control character, "
+               << result[rindex] << ", in hex (\\x" << s[sindex + 2] 
+               << s[sindex+3] << ".\nI recommend that you write this as "
+               << result[rindex] << " or \\" << result[rindex] 
+               << " depending on what you meant.\n";
+          break;
+        case '\0':
+          cerr << "Warning: null (\\x00) in layer7 regexp. "
+               << "A null terminates the regexp string!\n";
+	  break;
+        default:
+          break;
       }
       sindex += 3; /* 4 total */
     }
@@ -140,7 +143,7 @@ int l7_pattern::getMark()
   return mark;
 }
 
-char ** readl7dir(char * dirname)
+static char ** readl7dir(string dirname)
 {
   DIR * scratchdir;
   struct dirent ** namelist;
@@ -149,7 +152,7 @@ char ** readl7dir(char * dirname)
   int n, d = 1;
   subdirs[0] = "";
 
-  n = scandir(dirname, &namelist, 0, alphasort);
+  n = scandir(dirname.c_str(), &namelist, 0, alphasort);
 
   if (n < 0){
       perror("scandir");
@@ -160,7 +163,8 @@ char ** readl7dir(char * dirname)
     while(n--){
       char fulldirname[MAX_FN_LEN];
 
-      snprintf(fulldirname, MAX_FN_LEN, "%s/%s", dirname, namelist[n]->d_name);
+      snprintf(fulldirname, MAX_FN_LEN, "%s/%s", dirname.c_str(), 
+               namelist[n]->d_name);
 
       if((scratchdir = opendir(fulldirname)) != NULL)
       {
@@ -189,17 +193,17 @@ char ** readl7dir(char * dirname)
   return subdirs;
 }
 
-string findpatternfile(string protocol)
+static string findpatternfile(string protocol)
 {
   char filename[MAX_FN_LEN];
-  char * dir = "/etc/l7-protocols";
   char ** subdirs;
   int n = 0;
 
-  subdirs = readl7dir(dir);
+  subdirs = readl7dir(l7dir);
 
   while(subdirs[n] != NULL){
-    int c=snprintf(filename,MAX_FN_LEN,"%s/%s/%s.pat",dir,subdirs[n],protocol.c_str());
+    int c = snprintf(filename, MAX_FN_LEN, "%s/%s/%s.pat", l7dir.c_str(), 
+                     subdirs[n], protocol.c_str());
 
     if(c > MAX_FN_LEN){
       cerr << "Filename beginning with " << filename << " is too long!\n";
@@ -228,6 +232,8 @@ l7_classify::l7_classify(string filename)
   int nrules = 0;
 
   ifstream conf(filename.c_str());
+
+  l7printf(2, "Attempting to read configuration from %s\n", filename.c_str());
 
   if(!conf.is_open()){
     cerr << "Could not read from " << filename << endl;
@@ -264,7 +270,7 @@ l7_classify::l7_classify(string filename)
     patternfile = findpatternfile(proto);
     if(add_pattern_from_file(patternfile, mk)){
       nrules++;
-      l7printf(0, "Added: %s\t%d\t%s\n", proto.c_str(), mk, patternfile.c_str());
+      l7printf(0, "Added: %s\tmark=%d\n", proto.c_str(), mk);
     }
   }
 
@@ -280,150 +286,23 @@ l7_classify::~l7_classify()
 
 }
 
-// Returns true if the line (from a pattern file) is a comment
-int is_comment(string line)
-{
-	// blank lines are comments
-	if(line.size() == 0) return 1;
-
-	// lines starting with # are comments
-	if(line[0] == '#') return 1;
-
-	// lines with only whitespace are comments
-	for(unsigned int i = 0; i < line.size(); i++)
-		if(!isspace(line[i]))
-			return 0;
-	return 1;
-}
-
-// Extracts the protocol name from a line
-// This line should be exactly the name of the file without the .pat extension
-// However, we also allow junk after whitespace
-string get_protocol_name(string line)
-{
-  string name = "";
-  for(unsigned int i = 0; i < line.size(); i++)
-  {
-    if(!isspace(line[i]))
-      name += line[i];
-    else break;
-  }
-  return name;
-}
-
-// Returns the given file name from the last slash to the next dot
-string basename(string filename)
-{
-	int lastslash = filename.find_last_of('/');
-	int nextdot = filename.find_first_of('.', lastslash);
-
-	return filename.substr(lastslash+1, nextdot - (lastslash+1));
-}
-
-// Returns, e.g. "userspace pattern" if the line is "userspace pattern=.*foo"
-string attribute(string line)
-{
-  return line.substr(0, line.find_first_of('='));
-}
-
-// Returns, e.g. ".*foo" if the line is "userspace pattern=.*foo"
-string value(string line)
-{
-  return line.substr(line.find_first_of('=')+1);
-}
-
-// parse the regexec and regcomp flags
-// Returns 1 on sucess, 0 if any unrecognized flags were encountered
-int parseflags(int & cflags, int & eflags, string line)
-{
-  string flag = "";
-  cflags = 0;
-  eflags = 0;
-  for(unsigned int i = 0; i < line.size(); i++){
-    if(!isspace(line[i]))
-      flag += line[i];
-
-    if(isspace(line[i]) || i == line.size()-1){
-      if(flag == "REG_EXTENDED")     cflags |= REG_EXTENDED;
-      else if(flag == "REG_ICASE")   cflags |= REG_ICASE;
-      else if(flag == "REG_NOSUB")   cflags |= REG_NOSUB;
-      else if(flag == "REG_NEWLINE") cflags |= REG_NEWLINE;
-      else if(flag == "REG_NOTBOL")  eflags |= REG_NOTBOL;
-      else if(flag == "REG_NOTEOL")  eflags |= REG_NOTEOL;
-      else{
-        cerr << "Error: encountered unknown flag in pattern file " << flag << endl;
-        return 0;
-      }
-      flag = "";
-    }   
-  }
-  return 1;
-}
-
 // Returns 1 on sucess, 0 on failure
 int l7_classify::add_pattern_from_file(string filename, int mark) 
 {
-  ifstream the_file(filename.c_str());
+  int eflags, cflags;
+  string pattern = "";
 
-  // What we're looking for. It's either the protocol name, the kernel pattern,
-  // which we'll use if no other is present, or any of various (ok, two)
-  // userspace config lines.
-  enum { protocol, kpattern, userspace } state = protocol;
+  l7printf(2, "Attempting to load pattern from %s\n", filename.c_str());
 
-  string name = "";
-  string pattern="";
-  string line;
-  int cflags = REG_EXTENDED | REG_ICASE | REG_NOSUB;
-  int eflags = 0; 
-
-  while (!the_file.eof()){
-    getline(the_file, line);
-
-    if(is_comment(line)) continue;
-
-    if(state == protocol){
-      name = get_protocol_name(line);
- 
-      if(name != basename(filename)){
-        cerr << "Error: Protocol declared in file does not match file name.\n"
-          << "File name is " << basename(filename) 
-          << ", but the file says " << name << endl;
-        return 0;
-      }
-      state = kpattern;
-      continue;
-    }
-
-    if(state == kpattern){
-      pattern = line;
-      state = userspace;
-      continue;
-    }
-
-    if(state == userspace){
-
-      if(line.find_first_of('=') == string::npos){
-        cerr << "Warning: ignored malformed line in pattern file:\n\t"<<line<<endl;
-        continue;
-      }
-
-      if(attribute(line) == "userspace pattern"){
-        pattern = value(line);
-      }
-      else if(attribute(line) == "userspace flags"){
-        if(!parseflags(cflags, eflags, value(line)))
-          return 0;
-      }
-      else
-        cerr << "Warning: ignored unknown pattern file attribute \"" 
-          << attribute(line) << "\"\n";
-    }
+  if(!parse_pattern_file(cflags, eflags, pattern, filename)){
+    cerr << "Failed to parse pattern file " << filename << endl;
+    return 0;
   }
 
   l7printf(2, "pattern='%s'\n", pattern.c_str());
   l7printf(2, "eflags=%d cflags=%d\n", eflags, cflags);
 
-  l7_pattern *l7p = new l7_pattern(name, pattern, eflags, cflags, mark);
+  l7_pattern *l7p=new l7_pattern(basename(filename),pattern,eflags,cflags,mark);
   patterns.push_back(l7p);
   return 1;
 }
