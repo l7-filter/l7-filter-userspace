@@ -1,3 +1,7 @@
+v0.9 - 18 Sept 2008
+
+Added -z switch for daemonizing.
+
 v0.8 - 1 Sept 2008
 
 Implemented nfq_unbind_pf workaround so l7-filter works again with newer 

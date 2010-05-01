@@ -47,8 +47,6 @@ extern "C" {
 static l7_conntrack* l7_connection_tracker;
 static l7_queue* l7_queue_tracker;
 
-static bool isdaemon = false;
-
 // Configurable parameters
 extern int verbosity;
 extern int buflen;
@@ -59,6 +57,14 @@ extern unsigned int maskfirstbit;
 extern unsigned int masknbits;
 extern int clobbermark;
 
+static void handle_sigint(int s) {
+  // was there a reason for this?  It just makes it crash on Ctrl-C for me.
+  //delete l7_connection_tracker;
+  exit(0);
+}
+
+
+//queue functions
 
 #if 0
 /* returns packet id */
@@ -94,42 +100,6 @@ static u_int32_t print_pkt (struct nfq_data *tb)
   return id;
 }
 #endif
-
-static void unlink_pidfile(void)
-{
-  if (PID_FILENAME && isdaemon)
-    unlink(PID_FILENAME);
-}
-
-static void handle_sigint(int s) 
-{
-  exit(1);
-}
-
-static void handle_sigterm(int s)
-{
-   unlink_pidfile();
-   exit(2);
-}
-
-static void daemonize(void)
-{
-  cout << "Running as a daemon.  Goodbye.\n";
-
-  int ret = daemon(0, 0);
-
-  if(ret != 0){
-    cerr << "Couldn't daemonize.  Try running without -z.\n";
-    exit(255);
-  } else {
-    if (PID_FILENAME) {
-      // We are the child
-      ofstream pid_file(PID_FILENAME);
-      pid_file << getpid() << endl;
-      atexit(unlink_pidfile);
-    }
-  } 
-}
 
 static void * start_connection_tracking_thread(void *data) 
 {
@@ -182,7 +152,7 @@ static void handle_cmdline(int & qnum, string & conffilename,
   qnum = 0; // default
   buflen = 8*1500; //default (8 large packets worth)
   conffilename = ""; 
-  const char *opts = "f:q:vh?sb:dn:p:m:cz";
+  const char *opts = "f:q:vh?sb:dn:p:m:c";
 
   int done = 0;
   while(!done)
@@ -254,9 +224,6 @@ static void handle_cmdline(int & qnum, string & conffilename,
       case 's':
         verbosity = -1;
         break;
-      case 'z':
-        isdaemon = true;
-        break;
       case 'h':
       case '?':
       default:
@@ -278,7 +245,6 @@ static void handle_cmdline(int & qnum, string & conffilename,
           "-m mask\t\tOnly pay look at and set the given bits of marks\n"
           "-c\t\tClobber existing marks instead of passing them unmodified\n"
           "-d\t\tAllow configurations that are probably ill-advised\n"
-          "-z\t\tRun as daemon\n"
           "\n"
           "See also 'man l7-filter'\n";
         exit(1);
@@ -360,12 +326,8 @@ int main(int argc, char **argv)
   check_requirements();
 
   signal(SIGINT, handle_sigint);
-  signal(SIGTERM, handle_sigterm);
 
   l7_classify * l7_classifier = new l7_classify(conffilename);
-
-  if(isdaemon) daemonize(); // do this after reading and checking config file
-
   l7_connection_tracker = new l7_conntrack(l7_classifier);
   l7_queue_tracker = new l7_queue(l7_connection_tracker);
 
