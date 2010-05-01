@@ -35,6 +35,8 @@ using namespace std;
 #include <map>
 #include <netinet/in.h>
 
+#include <cstring>
+
 #include "l7-conntrack.h"
 #include "l7-queue.h"
 #include "util.h"

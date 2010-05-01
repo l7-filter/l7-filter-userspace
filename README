@@ -1,6 +1,6 @@
 This is a version of l7-filter that works in userspace instead of the 
 kernel.  It is eventually intended to replace the kernel version since 
-running in userspace is much safer and more flexible.  However, it in 
+running in userspace is much safer and more flexible.  However, it is in 
 the early stages of development and NOT yet ready for prime time.
 
 Full documentation is at http://l7-filter.sf.net/HOWTO-userspace 

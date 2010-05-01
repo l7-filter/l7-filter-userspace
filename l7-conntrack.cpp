@@ -21,6 +21,7 @@ using namespace std;
 #include <errno.h>
 #include <signal.h>
 #include <map>
+#include <cstring>
 
 extern "C" {
 #include <linux/netfilter.h>

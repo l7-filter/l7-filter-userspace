@@ -1,3 +1,8 @@
+v0.7 - 29 June 2008
+
+Made compatible with gcc 4.3, courtesy of Peter Alfredsen, loki_val at 
+gentoo dot org.
+
 v0.6 - 27 May 2008
 
 Added check for nf_conntrack_netlink.  Fixed silly crash when run by 

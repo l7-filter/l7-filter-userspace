@@ -22,6 +22,7 @@ using namespace std;
 
 #include <fstream>
 #include <iostream>
+#include <climits>
 
 #include <getopt.h>
 #include <stdio.h>
