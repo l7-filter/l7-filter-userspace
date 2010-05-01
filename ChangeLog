@@ -1,3 +1,12 @@
+v0.6 - 27 May 2008
+
+Added check for nf_conntrack_netlink.  Fixed silly crash when run by 
+non-root.
+
+0.5 tarball was made with "make gz", didn't include a bunch of necessary 
+files, and was thus totally useless.  Oops.  I'll tar it manually until 
+that's fixed.
+
 v0.5 - 7 May 2008
 
 Interface/documentation tweaks.  Fixed compilation warnings.  Fixed i486 

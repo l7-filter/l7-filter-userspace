@@ -197,16 +197,11 @@ l7_conntrack::~l7_conntrack()
 l7_conntrack::l7_conntrack(void* l7_classifier_in) 
 {
   l7_classifier = (l7_classify *)l7_classifier_in;
-  // Conntrack stuff
-  int ret = 0, errors = 0;
   
   // Now open a handler that is subscribed to all possible events
   cth = nfct_open(CONNTRACK, NFCT_ALL_CT_GROUPS);
   if (!cth) {
-    cerr << "Can't open handler\n";
-    errors++;
-    ret = -ENOENT;
-    nfct_conntrack_free(ct);
+    cerr << "Can't open handler.  Are you root?\n";
     exit(1);
   } 
 }

@@ -280,11 +280,13 @@ static int check_for_module(string mod)
 
 static void check_requirements()
 {
-  if(!check_for_module("ip_conntrack_netlink"))
+  if(!check_for_module("ip_conntrack_netlink") && 
+     !check_for_module("nf_conntrack_netlink"))
   {
     cerr << "\n                      ***WARNING***\n"
-     "ip_conntrack_netlink does not appear to be loaded. Unless it is\n" 
-     "compiled into your kernel, please load it and run l7-filter again.)\n\n";
+     "Neither ip_conntrack_netlink nor nf_conntrack_netlink appears to be\n"
+     "loaded. Unless one is compiled into your kernel, please load one and\n"
+     "run l7-filter again.\n\n";
     sleep(5); // give time for the user to notice the above.
   }
 }
