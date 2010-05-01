@@ -25,6 +25,8 @@ using namespace std;
 
 extern "C" {
 #include <linux/netfilter.h>
+#include <linux/types.h>
+#include <netinet/in.h>
 #include <libnetfilter_conntrack/libnetfilter_conntrack.h>
 }
 
@@ -202,7 +204,7 @@ l7_conntrack::l7_conntrack(void* l7_classifier_in)
   // Now open a handler that is subscribed to all possible events
   cth = nfct_open(CONNTRACK, NFCT_ALL_CT_GROUPS);
   if (!cth) {
-    cerr << "Can't open handler.  Are you root?\n";
+    cerr<<"Can't open Netfilter connection tracking handler.  Are you root?\n";
     exit(1);
   } 
 }

@@ -1,3 +1,10 @@
+v0.10 - 27 Sept 2008
+
+Added some #includes that aledr says makes it compile for him.  (It 
+already compiled for me.)
+
+Made a few common error messages more verbose.
+
 v0.9 - 18 Sept 2008
 
 Added -z switch for daemonizing.

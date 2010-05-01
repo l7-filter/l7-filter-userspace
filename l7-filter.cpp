@@ -40,6 +40,8 @@ using namespace std;
 
 extern "C" {
 #include <linux/netfilter.h>
+#include <linux/types.h>
+#include <netinet/in.h>
 #include <libnetfilter_conntrack/libnetfilter_conntrack.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
 }
@@ -297,7 +299,8 @@ static int check_for_module(string mod)
 {
   ifstream pm("/proc/modules");
   if(!pm.is_open()){
-    cerr << "What the...?  Failed to open /proc/modules!\n";
+    cerr << "Failed to open /proc/modules, can't check for required kernel "
+            "features.\n";
     return 0;
   }
 

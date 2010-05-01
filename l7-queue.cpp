@@ -34,6 +34,7 @@ using namespace std;
 #include <signal.h>
 #include <map>
 #include <netinet/in.h>
+#include <linux/types.h>
 
 #include <cstring>
 

@@ -162,8 +162,8 @@ static char ** readl7dir(string dirname)
   n = scandir(dirname.c_str(), &namelist, 0, alphasort);
 
   if (n < 0){
-      perror("scandir");
-      cerr << "Couldn't open " << dirname << endl;
+      perror(dirname.c_str());
+      cerr << "Couldn't open patterns directory at " << dirname << endl;
       exit(1);
   }
   else{
