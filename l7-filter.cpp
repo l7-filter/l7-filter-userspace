@@ -2,7 +2,7 @@
   Functions and classes which track the conntracks for l7-filter.
   
   By Ethan Sommer <sommere@users.sf.net> and Matthew Strait 
-  <quadong@users.sf.net>, (C) Nov 2006
+  <quadong@users.sf.net>, (C) 2006-2007
   http://l7-filter.sf.net 
 
   This program is free software; you can redistribute it and/or
@@ -22,6 +22,7 @@ using namespace std;
 
 #include <iostream>
 
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -31,6 +32,7 @@ using namespace std;
 #include "l7-conntrack.h"
 #include "l7-queue.h"
 #include "l7-classify.h"
+#include "util.h"
 
 extern "C" {
 #include <linux/netfilter.h>
@@ -41,6 +43,8 @@ extern "C" {
 static l7_conntrack* l7_connection_tracker;
 static l7_queue* l7_queue_tracker;
 static l7_classify* l7_classifier;
+
+extern int verbosity;
 
 static void handle_sigint(int s) {
   delete l7_connection_tracker;
@@ -97,26 +101,83 @@ void *start_connection_tracking_thread(void *data)
   pthread_exit(NULL);
 }
 
-void *start_queue_thread(void *data) 
+void *start_queue_thread(void * qnum) 
 {
-  l7_queue_tracker->start();
+  int * queuenum = (int *)qnum;
+
+  l7_queue_tracker->start(*queuenum);
   pthread_exit(NULL);
+}
+
+void handle_cmdline(int & qnum, string & conffilename, int argc, 
+  char ** argv)
+{
+  qnum = 0; // default
+  conffilename = ""; 
+  const char *opts = "f:q:vh?s";
+
+  int done = 0;
+  while(!done)
+  {
+    char c;
+    switch(c = getopt(argc, argv, opts))
+    {
+      case -1:
+        done = 1;
+        break;
+      case 'f':
+        conffilename = optarg;
+        break;
+      case 'q':
+        qnum = strtol(optarg, 0, 10);
+        if(qnum == LONG_MIN || qnum == LONG_MAX || qnum < 0 || qnum > 65536){
+          cerr << "queuenum is out of range.  Valid numbers are 0-65536.\n";
+          exit(1);
+        }
+        break;
+      case 'v':
+        verbosity++;
+        break;
+      case 's':
+        verbosity = -1;
+        break;
+      case 'h':
+      case '?':
+      default:
+        cerr << 
+          "l7-filter v" << L7VERSION << ", (C) 2006-2007 Ethan Sommer, Matthew Strait\n"
+          "l7-filter comes with ABSOLUTELY NO WARRANTY. This is free software\n"
+          "and you may redistribute it under the terms of the GPLv2.\n"
+          "\n"
+          "Syntax: l7-filter -f configuration_file [options]\n"
+          "\n"
+          "Options are:\n"
+          "-q queuenumber\tListen to the specified Netfilter queue\n"
+          "-v\t\tBe verbose. Mutiple -v options increase the verbosity\n"
+          "-s\t\tBe silent except in the case of warnings and errors.\n";
+        exit(1);
+        break;
+    }
+  }
+
+  if(conffilename == ""){
+    cerr << "You must specify a configuration file.  Try 'l7-filter -h'\n";
+    exit(1);
+  }
 }
 
 int main(int argc, char **argv) 
 {
-  int rc;
+  int rc, qnum;
+  string conffilename;
   pthread_t connection_tracking_thread;
   pthread_t queue_tracking_thread;
 
+  handle_cmdline(qnum, conffilename, argc, argv);
+
   signal(SIGINT, handle_sigint);
 
-  if(argc != 2){
-    cerr << "Usage: l7-filter configuration_file\n";
-    exit(1);
-  }
-
-  l7_classify * l7_classifier = new l7_classify(argv[1]);
+  l7_classify * l7_classifier = new l7_classify(conffilename);
   l7_connection_tracker = new l7_conntrack(l7_classifier);
   l7_queue_tracker = new l7_queue(l7_connection_tracker);
 
@@ -128,7 +189,7 @@ int main(int argc, char **argv)
   }
 
   //start up the queue thread
-  rc = pthread_create(&queue_tracking_thread, NULL,start_queue_thread, NULL);
+  rc = pthread_create(&queue_tracking_thread,NULL,start_queue_thread,(void *)(&qnum));
   if (rc){
     cerr << "Error creating queue thread. pthread_create returned " <<rc <<endl;
     exit(1);

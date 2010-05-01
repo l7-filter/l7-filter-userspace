@@ -8,22 +8,23 @@ documentation.
 
 *** Installation ***
 
-From ftp.netfilter.org or your distribution:
+From ftp.netfilter.org or your Linux distribution:
 install libnfnetlink
 install libnetfilter_queue
 install libnetfilter_conntrack
 
-Then run ./makeit.sh
+Then run "make" here.
 
 *** Running ***
 
 Make sure you have the ip_conntrack_netlink module loaded (or compiled 
 into your kernel): 
+
 modprobe ip_conntrack_netlink
 
 Run l7-filter:
 
-LD_LIBRARY_PATH=/usr/local/lib ./l7-filter configfile
+LD_LIBRARY_PATH=/usr/local/lib ./l7-filter -f configfile
 
 The LD_LIBRARY_PATH part may not be necessary for you.
 

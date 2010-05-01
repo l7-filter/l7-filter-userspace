@@ -3,7 +3,7 @@
   packets to their appropriate conntack for classification. 
   
   By Ethan Sommer <sommere@users.sf.net> and Matthew Strait 
-  <quadong@users.sf.net>, (C) 2006
+  <quadong@users.sf.net>, (C) 2006-2007
   http://l7-filter.sf.net 
 
   This program is free software; you can redistribute it and/or
@@ -20,7 +20,6 @@
 
 #include "l7-conntrack.h"
 
-
 #define L7_NUM_PACKETS 8
 #define NO_MATCH 65536
 #define NO_MATCH_YET NO_MATCH-1
@@ -35,8 +34,8 @@ class l7_queue {
  public:
   l7_queue(l7_conntrack* connection_tracker);
   ~l7_queue();
-  void start();
-  u_int32_t handle_packet(struct nfq_data *nfa);
+  void start(int queuenum);
+  u_int32_t handle_packet(struct nfq_data *nfa, struct nfq_q_handle *qh);
 };
 
 static int l7_queue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,

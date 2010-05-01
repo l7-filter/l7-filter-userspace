@@ -2,7 +2,7 @@
   Functions and classes which track the conntracks for l7-filter.
   
   By Ethan Sommer <sommere@users.sf.net> and Matthew Strait 
-  <quadong@users.sf.net>, (C) Nov 2006
+  <quadong@users.sf.net>, (C) 2006-2007
   http://l7-filter.sf.net 
 
   This program is free software; you can redistribute it and/or
@@ -32,20 +32,21 @@ extern "C" {
 
 #include "l7-conntrack.h"
 #include "l7-classify.h"
+#include "l7-queue.h"
+#include "util.h"
 
 l7_classify* l7_classifier;
 
-l7_connection::l7_connection(string key) 
+l7_connection::l7_connection() 
 {
-  this->key=key;
   pthread_mutex_init(&num_packets_mutex, NULL);
   pthread_mutex_init(&buffer_mutex, NULL);
-  lengthsofar=0;
-  num_packets=0;
-  mark=0;
+  lengthsofar = 0;
+  num_packets = 0;
+  mark = 0;
 }
 
-l7_connection::~l7_connection () 
+l7_connection::~l7_connection() 
 {
   //clean up stuff
   pthread_mutex_destroy(&num_packets_mutex);
@@ -74,7 +75,7 @@ int l7_connection::get_num_packets()
 u_int32_t l7_connection::classify() 
 {
   pthread_mutex_lock (&buffer_mutex);
-  if (mark == 0)
+  if (mark == 0 || mark == NO_MATCH_YET)
     mark = l7_classifier->classify(buffer);
 
   pthread_mutex_unlock (&buffer_mutex);
@@ -90,23 +91,20 @@ void l7_connection::append_to_buffer(char *app_data, int appdatalen)
 {
   pthread_mutex_lock (&buffer_mutex);
 
-  int length = 0, i;
+  int length = 0;
   int oldlength = lengthsofar;
 
-  /* Strip nulls. Make everything lower case (TODO: make this more 
-     flexible).  Add it to the end of the current data. */
-  for(i = 0; i < maxdatalen-lengthsofar-1 && i < appdatalen; i++) {
+  /* Strip nulls.  Add it to the end of the current data. */
+  for(int i = 0; i < maxdatalen-lengthsofar-1 && i < appdatalen; i++) {
     if(app_data[i] != '\0') {
-      buffer[length+oldlength] =
-	/* the kernel version of tolower mungs 'upper ascii' */
-	isascii(app_data[i])? tolower(app_data[i]) : app_data[i];
+      buffer[length+oldlength] = app_data[i];
       length++;
     }
   }
 
   buffer[length+oldlength] = '\0';
   lengthsofar = length + lengthsofar;
-  //cerr << "length so far: " << lengthsofar << endl;
+  l7printf(3, "Appended data. Length so far = %d\n", lengthsofar);
 
   pthread_mutex_unlock (&buffer_mutex);
 }
@@ -117,7 +115,6 @@ char *l7_connection::get_buffer()
   return (char *)buffer;
 }
 
-// XXX NOT consistent with get_conntrack_key!  Nothing will work until this is fixed!
 static int sprintf_conntrack_key(char *buf, struct nfct_conntrack *ct, 
                           unsigned int flags) 
 {
@@ -128,53 +125,58 @@ static int sprintf_conntrack_key(char *buf, struct nfct_conntrack *ct,
   size += nfct_sprintf_proto(buf+size, &ct->tuple[NFCT_DIR_ORIGINAL]);
 
   /* Delete the last blank space */
-  return size - 1;
+  buf[size-1] = '\0';
+
+  return size;
 }
 
+static string make_key(nfct_conntrack* ct, int flags)
+{
+  char key[512];
+  int keysize = sprintf_conntrack_key(key, ct, flags);
+  if(keysize >= 512){
+    cerr << "Yike! Overflowed key!\n";
+    exit(1);
+  }
+  l7printf(2, "Made key from ct:\t%s\n", key);
+  return key;
+}
 
 static int l7_handle_conntrack_event(void *arg, unsigned int flags, int type, 
 					void *data)
 {
   l7_conntrack * l7_conntrack_handler = (l7_conntrack *) data;
-  static int counter = 0, size, keysize = 0;
-
-  char key[512];
-  char buf[512];
 
   nfct_conntrack* ct = (nfct_conntrack*)arg;
 
-  // I don't think there is any demand for ICMP.  These two are enough work for now.
-  if(ct->tuple[0].protonum != IPPROTO_TCP && ct->tuple[0].protonum != IPPROTO_UDP) return 0;
+  // I don't think there is any demand for ICMP. These are enough work for now.
+  if(ct->tuple[0].protonum != IPPROTO_TCP && 
+     ct->tuple[0].protonum != IPPROTO_UDP) return 0;
 
-  keysize = sprintf_conntrack_key(key, (nfct_conntrack*)arg, flags);
-  if(keysize >= 512){ cerr << "Yike!\n"; exit(1); } // catch overflow.
-  sprintf(key+keysize, "");
-  string skey = key;
+  if(type == NFCT_MSG_DESTROY) l7printf(3, "Got event: NFCT_MSG_DESTROY\n");
+  if(type == NFCT_MSG_NEW)     l7printf(3, "Got event: NFCT_MSG_NEW\n");
+  if(type == NFCT_MSG_UPDATE)  l7printf(3, "Got event: NFCT_MSG_UPDATE\n");
+  if(type == NFCT_MSG_UNKNOWN) l7printf(3, "Got event: NFCT_MSG_UNKNOWN\n");
 
-  #ifdef DEBUG  
-  if(type == NFCT_MSG_DESTROY) cout << "NFCT_MSG_DESTROY\t";
-  if(type == NFCT_MSG_NEW) cout << "NFCT_MSG_NEW\t";
-  if(type == NFCT_MSG_UPDATE) cout << "NFCT_MSG_UPDATE\t";
-  if(type == NFCT_MSG_UNKNOWN) cout << "NFCT_MSG_UNKNOWN\t";
-  cout << key << endl;
-  #endif
-
-  if (type == NFCT_MSG_NEW){ // first packet
-    // create the connection buffer, etc.
-    if (l7_conntrack_handler->get_l7_connection(skey)){
-      cerr << "Received NFCT_MSG_NEW but we already have a connection" << endl;
-      cerr << "Num packets = " << l7_conntrack_handler->get_l7_connection(skey)->get_num_packets() << endl;
-      l7_conntrack_handler->remove_l7_connection(skey);
-    } 
-	  
-    l7_connection *thisconnection = new l7_connection("foo");
-    l7_conntrack_handler->add_l7_connection(thisconnection, skey);
-    thisconnection->key=skey;
+  // On the first packet, create the connection buffer, etc.
+  if(type == NFCT_MSG_NEW){
+    string key = make_key(ct, flags);
+    if (l7_conntrack_handler->get_l7_connection(key)){
+      cerr << "Received NFCT_MSG_NEW but already have a connection. Packets = " 
+           << l7_conntrack_handler->get_l7_connection(key)->get_num_packets() 
+           << endl;
+      l7_conntrack_handler->remove_l7_connection(key);
+    }
+    
+    l7_connection *thisconnection = new l7_connection();
+    l7_conntrack_handler->add_l7_connection(thisconnection, key);
+    thisconnection->key = key;
   }
-  else if (type == NFCT_MSG_DESTROY){
-    // clean up the connection buffer, etc
-    if (l7_conntrack_handler->get_l7_connection(skey)){
-      l7_conntrack_handler->remove_l7_connection(skey);
+  else if(type == NFCT_MSG_DESTROY){
+    // clean up the connection buffer, etc.
+    string key = make_key(ct, flags);
+    if(l7_conntrack_handler->get_l7_connection(key)){
+      l7_conntrack_handler->remove_l7_connection(key);
     }
   }
 	
@@ -192,19 +194,19 @@ l7_conntrack::l7_conntrack(void* l7_classifier_in)
 {
   l7_classifier = (l7_classify *)l7_classifier_in;
   // Conntrack stuff
-  unsigned long status = IPS_ASSURED | IPS_CONFIRMED;
-  unsigned long timeout = 100;
-  unsigned long mark = 0;
-  unsigned long id = NFCT_ANY_ID;
+//  unsigned long status = IPS_ASSURED | IPS_CONFIRMED;
+//  unsigned long timeout = 100;
+//  unsigned long mark = 0;
+//  unsigned long id = NFCT_ANY_ID;
   int ret = 0, errors = 0;
   
   // netfilter queue stuff
-  struct nfq_handle *h;
-  struct nfq_q_handle *qh;
-  struct nfnl_handle *nh;
-  int fd;
-  int rv;
-  char buf[4096];
+//  struct nfq_handle *h;
+//  struct nfq_q_handle *qh;
+//  struct nfnl_handle *nh;
+//  int fd;
+//  int rv;
+//  char buf[4096];
   
   // Now open a handler that is subscribed to all possible events
   cth = nfct_open(CONNTRACK, NFCT_ALL_CT_GROUPS);
@@ -225,7 +227,7 @@ l7_connection *l7_conntrack::get_l7_connection(const string key)
 void l7_conntrack::add_l7_connection(l7_connection* connection, 
 					const string key) 
 {
-  l7_connections[key]=connection;
+  l7_connections[key] = connection;
 }
 
 void l7_conntrack::remove_l7_connection(const string key) 

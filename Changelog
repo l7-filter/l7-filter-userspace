@@ -1,3 +1,14 @@
+v0.2 - 9 Jan 2007
+
+Makefile now has dependencies and stuff.
+
+Removed forced case insensitivity.  Implemented extended pattern files.  
+Case sensitivity is now the default, but can be overridden with the 
+"userspace flags" line in pattern files.
+
+Can now select the queue number.  Configuration file is now specified 
+after "-f" instead of being bare.
+
 v0.1 - 7 Dec 2006
 
 Initial release.  TCP and UDP mostly work. Initial UDP packets are 

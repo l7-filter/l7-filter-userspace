@@ -4,7 +4,7 @@
   of application data.
   
   By Ethan Sommer <sommere@users.sf.net> and Matthew Strait 
-  <quadong@users.sf.net>, (C) Nov 2006
+  <quadong@users.sf.net>, (C) Nov 2006-2007
   http://l7-filter.sf.net 
 
   This program is free software; you can redistribute it and/or
@@ -32,13 +32,15 @@ class l7_pattern {
  private:
   int mark;
   string pattern_string;
+  int eflags; // for regexec
+  int cflags; // for regcomp
   string name;
   regex_t preg;//the compiled regex
   char * pre_process(const char * s);
   int hex2dec(char c);
 
  public:
-  l7_pattern(string name, string pattern_string, int mark);
+  l7_pattern(string name, string pattern_string, int eflags, int cflags, int mark);
   ~l7_pattern();
   bool matches(char * buffer);
   string getName();
@@ -48,11 +50,11 @@ class l7_pattern {
 class l7_classify {
 
  private:
-  void add_pattern_from_file(const string filename, int mark);
+  int add_pattern_from_file(const string filename, int mark);
   list<l7_pattern *> patterns;
   
  public:
-  l7_classify(char * filename);
+  l7_classify(string filename);
   ~l7_classify();
   int classify(char * buffer);
 };

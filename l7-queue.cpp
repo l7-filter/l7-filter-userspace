@@ -3,7 +3,7 @@
   packets to their appropriate conntack for classification. 
   
   By Ethan Sommer <sommere@users.sf.net> and Matthew Strait 
-  <quadong@users.sf.net>, Nov 2006.
+  <quadong@users.sf.net>, 2006-2007
   http://l7-filter.sf.net 
 
   This program is free software; you can redistribute it and/or
@@ -37,6 +37,7 @@ using namespace std;
 
 #include "l7-conntrack.h"
 #include "l7-queue.h"
+#include "util.h"
 
 extern "C" {
 #include <linux/netfilter.h>
@@ -55,7 +56,7 @@ l7_queue::~l7_queue()
 }
 
 
-void l7_queue::start() 
+void l7_queue::start(int queuenum) 
 {
   struct nfq_handle *h;
   struct nfq_q_handle *qh;
@@ -64,34 +65,34 @@ void l7_queue::start()
   int rv;
   char buf[4096];
 
-  //cout << "opening library handle\n";
+  l7printf(3, "opening library handle\n");
   h = nfq_open();
-  if (!h) {
+  if(!h) {
     cerr << "error during nfq_open()\n";
     exit(1);
   }
 
-  //cout << "unbinding existing nf_queue handler for AF_INET (if any)\n";
-  if (nfq_unbind_pf(h, AF_INET) < 0) {
+  l7printf(3, "unbinding existing nf_queue handler for AF_INET (if any)\n");
+  if(nfq_unbind_pf(h, AF_INET) < 0) {
     cerr << "error during nfq_unbind_pf()\n";
     exit(1);
   }
 
-  //cout << "binding nfnetlink_queue as nf_queue handler for AF_INET\n";
-  if (nfq_bind_pf(h, AF_INET) < 0) {
+  l7printf(3, "binding nfnetlink_queue as nf_queue handler for AF_INET\n");
+  if(nfq_bind_pf(h, AF_INET) < 0) {
     cerr << "error during nfq_bind_pf()\n";
     exit(1);
   }
 
-  //cout << "binding this socket to queue '0'\n";
-  qh = nfq_create_queue(h,  0, &l7_queue_cb, this);
-  if (!qh) {
+  l7printf(3, "binding this socket to queue '0'\n");
+  qh = nfq_create_queue(h, queuenum, &l7_queue_cb, this);
+  if(!qh) {
     cerr << "error during nfq_create_queue()\n";
     exit(1);
   }
 
-  //cout << "setting copy_packet mode\n";
-  if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
+  l7printf(3, "setting copy_packet mode\n");
+  if(nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
     cerr << "can't set packet_copy mode\n";
     exit(1);
   }
@@ -108,16 +109,16 @@ void l7_queue::start()
     cerr << "errno=" << errno << endl;
     cerr << "errstr=" << strerror(errno) << endl;
   }
-  cout << "unbinding from queue 0\n";
+  l7printf(3, "unbinding from queue 0\n");
   nfq_destroy_queue(qh);
 
-  cout << "closing library handle\n";
+  l7printf(3, "closing library handle\n");
   nfq_close(h);
 
   exit(0);
 }
 
-u_int32_t l7_queue::handle_packet(nfq_data * tb) 
+u_int32_t l7_queue::handle_packet(nfq_data * tb, struct nfq_q_handle *qh) 
 {
   int id = 0, ret, dataoffset, datalen;
   u_int32_t mark, ifi; 
@@ -126,32 +127,29 @@ u_int32_t l7_queue::handle_packet(nfq_data * tb)
   l7_connection * connection;
 
   ph = nfq_get_msg_packet_hdr(tb);
-  if (ph){
+  if(ph){
     id = ntohl(ph->packet_id);
-    #ifdef DEBUG
-    printf("hw_protocol=0x%04x hook=%u id=%u ",ntohs(ph->hw_protocol),ph->hook,id);
-    #endif
+    l7printf(4, "hw_protocol = 0x%04x hook = %u id = %u ", 
+      ntohs(ph->hw_protocol), ph->hook, id);
   }
 
   mark = nfq_get_nfmark(tb);
-  #ifdef DEBUG
-  if (mark) cout << "mark = " << mark << " ";
-  #endif
+  if(mark) l7printf(4, "mark = %d ", mark);
 
   ifi = nfq_get_indev(tb);
-  #ifdef DEBUG
-  if (ifi) cout << "indev = " << ifi << " ";
-  #endif 
+  if(ifi) l7printf(4, "indev = %d ", ifi);
 
   ifi = nfq_get_outdev(tb);
-  #ifdef DEBUG
-  if (ifi) cout << "outdev = " << ifi << " ";
-  #endif
+  if(ifi) l7printf(4, "outdev = %d ", ifi);
 
   ret = nfq_get_payload(tb, &data);
-  #ifdef DEBUG
-  if (ret >= 0) cout << "payload_len = " << ret << " ";
-  #endif
+  if(ret >= 0) l7printf(4, "payload_len = %d\n", ret);
+  
+  char ip_protocol = data[9];
+
+  // Ignore anything that's not TCP or UDP
+  if(ip_protocol != IPPROTO_TCP && ip_protocol != IPPROTO_UDP)
+    return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 
   dataoffset = app_data_offset((const unsigned char*)data);
   datalen = ret - dataoffset;
@@ -160,54 +158,60 @@ u_int32_t l7_queue::handle_packet(nfq_data * tb)
     //find the conntrack 
     string key = get_conntrack_key((const unsigned char*)data, false);
     connection = l7_connection_tracker->get_l7_connection(key);
-
-    //if(connection) cout << "Found connection orig:\t" << key << endl;    
+  
+    if(connection)
+      l7printf(3, "Found connection orig:\t%s\n", key.c_str());
     if(!connection){
       //find the conntrack 
       string key = get_conntrack_key((const unsigned char*)data, true);
       connection = l7_connection_tracker->get_l7_connection(key);
-
-      //if(connection) cout << "Found connection reply:\t" << key << endl;
-
+  
+      if(connection)
+        l7printf(3, "Found connection reply:\t%s\n", key.c_str());
+  
       // It seems to routinely not get the UDP conntrack until the 2nd or 3rd
       // packet.  Tested with DNS.
-      if(!connection) cout << "Got packet but had no connection:\t" << key << endl;
+      if(!connection)
+        l7printf(2, "Got packet, had no ct:\t%s\n", key.c_str());
     }
     
     if(connection){
       connection->increment_num_packets();
-      if(connection->get_mark() != 0)
-	mark = connection->get_mark();
-      
+      if(connection->get_mark() != 0 && connection->get_mark() != NO_MATCH_YET){
+        mark = connection->get_mark();
+      }
       else if(connection->get_num_packets() <= L7_NUM_PACKETS){
         connection->append_to_buffer((char*)(data+dataoffset),ret-dataoffset); 
+        l7printf(3, "Packet number: %d\n", connection->get_num_packets());
+        l7printf(3, "Data is: %s\n", 
+          friendly_print((unsigned char *)connection->buffer, connection->lengthsofar).c_str());
         mark = connection->classify();
-        if(mark == 0) mark = NO_MATCH_YET; // Nothing matched
       }
       else{
         mark = NO_MATCH; // Nothing matched before and we've given up
         if(connection->get_num_packets() == L7_NUM_PACKETS+1){
-          cerr << "Gave up on " << key << endl << "Data was: " 
-               << friendly_print((unsigned char *)connection->buffer, connection->lengthsofar)
-               << endl;
+          l7printf(1, "Gave up on %s\n", key.c_str());
+          l7printf(2, "Data was: %s\n", 
+            friendly_print((unsigned char *)connection->buffer, connection->lengthsofar).c_str());
         }
       }
     }
+    else{
+      l7printf(3, "No match yet for\t%s", key.c_str());
+      mark = NO_MATCH_YET;
+    }
   }
-  else mark = NO_MATCH_YET; // no application data
-
-  #ifdef DEBUG
-  putchar('\n');
-  #endif
+  else{
+    l7printf(3, "Connection with no new application data ignored.\n");
+    mark = NO_MATCH_YET; // no application data
+  }
 
   if(mark == 0){
-    #ifdef DEBUG
-    cerr << "mark was still 0" << endl;
-    #endif
+    cerr << "NOT REACHED!\n";
     mark = NO_MATCH_YET;
   }
   
-  return mark;
+  return nfq_set_verdict_mark(qh, id, NF_REPEAT, htonl(mark), 0, NULL);
 }
 
 
@@ -215,7 +219,6 @@ u_int32_t l7_queue::handle_packet(nfq_data * tb)
 string l7_queue::get_conntrack_key(const unsigned char *data, bool reverse) 
 {
   char * buf = (char *)malloc(256);
-  int i;
   int ip_hl = 4*(data[0] & 0x0f);
   char ip_protocol = data[9];
 
@@ -248,13 +251,13 @@ string l7_queue::get_conntrack_key(const unsigned char *data, bool reverse)
     }
   }
   else{
-    cout << "Tried to handle unsupported protocol!\n";
+    l7printf(0, "Tried to get conntrack key for unsupported protocol!\n");
     buf[0] = '\0';
   }
   string answer = buf;
   free(buf);
 
-  //cout << "Made key:\t" << answer << endl;
+  l7printf(3, "Made key from packet:\t%s\n", answer.c_str());
 
   return answer;
 }
@@ -262,7 +265,6 @@ string l7_queue::get_conntrack_key(const unsigned char *data, bool reverse)
 /* Returns offset the into the skb->data that the application data starts */
 int l7_queue::app_data_offset(const unsigned char *data)
 {
-  int i;
   int ip_hl = 4*(data[0] & 0x0f);
   char ip_protocol = data[9];
 
@@ -275,7 +277,7 @@ int l7_queue::app_data_offset(const unsigned char *data)
     return ip_hl + 8; /* UDP header is always 8 bytes */
   }
   else{
-      cout << "Tried to handle unsupported protocol!\n";
+      l7printf(0, "Tried to get app data offset for unsupported protocol!\n");
       return ip_hl + 8; /* something reasonable */
   }
 }
@@ -287,7 +289,7 @@ string l7_queue::friendly_print(unsigned char * s, int size)
   char * f = (char *)malloc(size + 1);
   
   int i;
-  if (size <= 0) return NULL;
+  if(size <= 0) return NULL;
 
   if(!f){
     cerr << "Out of memory in friendly_print, bailing.\n";
@@ -310,20 +312,16 @@ static int l7_queue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 {
   struct nfqnl_msg_packet_hdr *ph;
 
-  u_int32_t id=0;
+  u_int32_t id = 0;
   ph = nfq_get_msg_packet_hdr(nfa);
-  if (ph){
+  if(ph)
     id = ntohl(ph->packet_id);
-  }
-  u_int32_t mark = nfq_get_nfmark(nfa);
-  #ifdef DEBUG
-  cerr << "preMark=" << mark << endl; 
-  #endif
-
-  if (mark!=0) 
-    return nfq_set_verdict_mark(qh, id, NF_ACCEPT,htonl(mark), 0, NULL);
-
-  mark = ((l7_queue *)data)->handle_packet(nfa);
   
-  return nfq_set_verdict_mark(qh, id, NF_REPEAT,htonl(mark), 0, NULL);
+  u_int32_t mark = nfq_get_nfmark(nfa);
+
+  // If it already has a mark, just pass it back with the same mark
+  if(mark != 0)
+    return nfq_set_verdict_mark(qh, id, NF_ACCEPT, htonl(mark), 0, NULL);
+
+  return ((l7_queue *)data)->handle_packet(nfa, qh);
 }

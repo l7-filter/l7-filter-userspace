@@ -1,0 +1,13 @@
+- Make child connections (FTP, IRC, etc.) work.
+
+- Make selection of NO_MATCH and NO_MATCH_YET user friendly.
+
+- Catch first packet of UDP "connections".
+
+- Use a more efficient scheme for finding connections.
+
+- Check for required modules.
+
+- Make sure that all errors/warnings are reported.
+
+- Much more?
