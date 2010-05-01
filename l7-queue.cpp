@@ -53,6 +53,34 @@ extern "C" {
 }
 
 
+static int l7_queue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
+		       struct nfq_data *nfa, void *data) 
+{
+  struct nfqnl_msg_packet_hdr *ph;
+
+  u_int32_t id = 0;
+  ph = nfq_get_msg_packet_hdr(nfa);
+  if(ph)
+    id = ntohl(ph->packet_id);
+  
+  u_int32_t wholemark = nfq_get_nfmark(nfa);
+
+  // If it already has a mark (and we don't want to clobber it), 
+  // just pass it back with the same mark
+  if((wholemark<<maskfirstbit)&markmask != UNTOUCHED && !clobbermark){
+    static unsigned int naaltered = 0;
+    naaltered++;
+    if((naaltered^(naaltered-1)) == (2*naaltered-1)) // is it a power of 2?
+      cerr << "My part of the mark has already been altered, ignoring these "
+              "packets!\n(" << naaltered << " ignored so far.) "
+              "Fix your rules or use l7-filter -c.\n";
+    return nfq_set_verdict_mark(qh, id, NF_ACCEPT, htonl(wholemark), 0, NULL);
+  }
+
+  return ((l7_queue *)data)->handle_packet(nfa, qh);
+}
+
+
 l7_queue::l7_queue(l7_conntrack *connection_tracker) 
 {
   l7_connection_tracker = connection_tracker;
@@ -242,7 +270,7 @@ u_int32_t l7_queue::handle_packet(nfq_data * tb, struct nfq_q_handle *qh)
 
   if(mark == UNTOUCHED) cerr << "NOT REACHED. mark is still UNTOUCHED.\n";
 
-  l7printf(4, "Set verdict: ACCEPT %#08x\n", (mark<<maskfirstbit)|wholemark);
+  l7printf(4,"Set verdict ACCEPT, mark %#08x\n",(mark<<maskfirstbit)|wholemark);
   return nfq_set_verdict_mark(qh, id, NF_ACCEPT, 
                               htonl((mark<<maskfirstbit)|wholemark), 0, NULL);
 }
@@ -316,31 +344,4 @@ int l7_queue::app_data_offset(const unsigned char *data)
       l7printf(0, "Tried to get app data offset for unsupported protocol!\n");
       return ip_hl + 8; /* something reasonable */
   }
-}
-
-static int l7_queue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
-		       struct nfq_data *nfa, void *data) 
-{
-  struct nfqnl_msg_packet_hdr *ph;
-
-  u_int32_t id = 0;
-  ph = nfq_get_msg_packet_hdr(nfa);
-  if(ph)
-    id = ntohl(ph->packet_id);
-  
-  u_int32_t wholemark = nfq_get_nfmark(nfa);
-
-  // If it already has a mark (and we don't want to clobber it), 
-  // just pass it back with the same mark
-  if((wholemark<<maskfirstbit)&markmask != UNTOUCHED && !clobbermark){
-    static unsigned int naaltered = 0;
-    naaltered++;
-    if((naaltered^(naaltered-1)) == (2*naaltered-1)) // is it a power of 2?
-      cerr << "My part of the mark has already been altered, ignoring these "
-              "packets!\n(" << naaltered << " ignored so far.) "
-              "Fix your rules or use l7-filter -c.\n";
-    return nfq_set_verdict_mark(qh, id, NF_ACCEPT, htonl(wholemark), 0, NULL);
-  }
-
-  return ((l7_queue *)data)->handle_packet(nfa, qh);
 }

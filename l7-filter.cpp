@@ -26,6 +26,7 @@ using namespace std;
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
 #include <map>
@@ -34,6 +35,7 @@ using namespace std;
 #include "l7-queue.h"
 #include "l7-classify.h"
 #include "util.h"
+#include "config.h"
 
 extern "C" {
 #include <linux/netfilter.h>
@@ -43,7 +45,6 @@ extern "C" {
 
 static l7_conntrack* l7_connection_tracker;
 static l7_queue* l7_queue_tracker;
-static l7_classify* l7_classifier;
 
 // Configurable parameters
 extern int verbosity;
@@ -64,6 +65,7 @@ static void handle_sigint(int s) {
 
 //queue functions
 
+#if 0
 /* returns packet id */
 static u_int32_t print_pkt (struct nfq_data *tb)
 {
@@ -96,14 +98,7 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 
   return id;
 }
-
-static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
-  struct nfq_data *nfa, void *data) 
-{
-  u_int32_t id = print_pkt(nfa);
-  l7printf(3, "entering callback\n");
-  return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
-}
+#endif
 
 static void * start_connection_tracking_thread(void *data) 
 {
@@ -234,7 +229,7 @@ static void handle_cmdline(int & qnum, string & conffilename,
       case '?':
       default:
         cerr << 
-          "l7-filter v" << L7VERSION <<
+          "l7-filter v" << VERSION <<
           ", (C) 2006-2007 Ethan Sommer, Matthew Strait\n"
           "l7-filter comes with ABSOLUTELY NO WARRANTY. This is free software\n"
           "and you may redistribute it under the terms of the GPLv2.\n"
@@ -288,12 +283,10 @@ static void check_requirements()
   if(!check_for_module("ip_conntrack_netlink"))
   {
     cerr << "\n                      ***WARNING***\n"
-            "The ip_conntrack_netlink module does not appear to be loaded.\n"
-            "Unless you have it compiled into your kernel, please load it\n"
-            "and run l7-filter again.\n\n";
+     "ip_conntrack_netlink does not appear to be loaded. Unless it is\n" 
+     "compiled into your kernel, please load it and run l7-filter again.)\n\n";
     sleep(5); // give time for the user to notice the above.
   }
-   
 }
 
 int main(int argc, char **argv) 
@@ -303,9 +296,9 @@ int main(int argc, char **argv)
   pthread_t connection_tracking_thread;
   pthread_t queue_tracking_thread;
 
-  check_requirements();
-
   handle_cmdline(qnum, conffilename, argc, argv);
+
+  check_requirements();
 
   signal(SIGINT, handle_sigint);
 
@@ -331,6 +324,6 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-//  pthread_exit(NULL);
-  sleep(0xffffffff); // Sleep for 78 years (forever)
+  pthread_join(connection_tracking_thread, NULL);
+  pthread_join(queue_tracking_thread, NULL);
 }

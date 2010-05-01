@@ -11,6 +11,8 @@ l7-filter" after installing.
 *** Installation ***
 
 - Run "./configure" to check for dependencies.
+    You will likely need to install libnetfilter_conntrack and 
+    libnetfilter_queue from ftp.netfilter.org
 - Run "make".
 - Run "sudo make install" or similar.
 

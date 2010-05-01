@@ -2,12 +2,15 @@ For bringing this version up to speed with the kernel version and basic sanity:
 
 - Make child connections (FTP, IRC, etc.) work.  This appears to be 
 difficult. Can it be handled with iptables rules instead?  Doesn't 
-really seem like it.
+really seem like it.  Can EXPECT in 
+libnetfilter_conntrack-0.0.31/include/libnetfilter_conntrack/libnetfilter_conntrack.h
+help?
 
 - Catch first packet of UDP "connections".
 
 - Are ^ and $ handled sensibly?  It seems so, yet the testing suite has 
 some sort of quirk about newlines.
+
 
 Things to work on after v1.0:
 
@@ -18,3 +21,8 @@ which are faster or more accurate than the default.
 
 - Allow pattern files to specify that l7-filter should use a compiled in 
 function for matching instead of a regular expression.
+
+
+Things to do once there is support for them in the kernel:
+
+- Instead of ACCEPTing all packets, instead be a non-terminating rule.

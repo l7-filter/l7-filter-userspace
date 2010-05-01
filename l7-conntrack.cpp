@@ -92,15 +92,14 @@ u_int32_t l7_connection::get_mark()
   return mark;
 }
 
-void l7_connection::append_to_buffer(char *app_data, int appdatalen) 
+void l7_connection::append_to_buffer(char *app_data, unsigned int appdatalen) 
 {
   pthread_mutex_lock(&buffer_mutex);
 
-  int length = 0;
-  int oldlength = lengthsofar;
+  unsigned int length = 0, oldlength = lengthsofar;
 
   /* Strip nulls.  Add it to the end of the current data. */
-  for(int i = 0; i < buflen-lengthsofar && i < appdatalen; i++) {
+  for(unsigned int i = 0; i < buflen-lengthsofar && i < appdatalen; i++) {
     if(app_data[i] != '\0') {
       buffer[length+oldlength] = app_data[i];
       length++;

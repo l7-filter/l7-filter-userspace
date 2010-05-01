@@ -1,3 +1,9 @@
+v0.5 - 7 May 2008
+
+Interface/documentation tweaks.  Fixed compilation warnings.  Fixed i486 
+sleep bug (and general kludge).  Started using autoconf.  Fixed compilation
+error with gcc 4.3.
+
 v0.4 - 7 March 2007
 
 Implemented the -m and -c options.  Changed the values of NO_MATCH and 

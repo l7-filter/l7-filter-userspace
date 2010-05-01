@@ -80,7 +80,7 @@ int l7_pattern::hex2dec(char c)
 char * l7_pattern::pre_process(const char * s) 
 {
   char * result = (char *)malloc(strlen(s) + 1);
-  int sindex = 0, rindex = 0;
+  unsigned int sindex = 0, rindex = 0;
   while( sindex < strlen(s) ) {
     if( sindex + 3 < strlen(s) && s[sindex] == '\\' && s[sindex+1] == 'x' && 
 	isxdigit(s[sindex + 2]) && isxdigit(s[sindex + 3]) ){
@@ -251,7 +251,7 @@ l7_classify::l7_classify(string filename)
   while(getline(conf, line)){
     stringstream sline;
     string proto, patternfile;
-    int mk;
+    unsigned int mk;
     bool nothingbutspaces = true;
 
     // Lines starting with # are comments
