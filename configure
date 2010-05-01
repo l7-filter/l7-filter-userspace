@@ -4,24 +4,17 @@ ok=0
 
 checkinclude()
 {
-	printf "checking for $2... "
+	printf "checking for $1... "
 	
-	cat > check$$.c <<- EOF
-		#include <$1>
-		int main(){}
-	EOF
-	
-	if ! gcc -o /dev/null check$$.c 2> /dev/null; then
-		printf "\n\tYou do not seem to have $2\n"
-		found=1
+	# only the preprocessor is needed check for the libaries
+	if ! gcc -o /dev/null -L /usr/local/lib/ -l$1 check$$.c &> /dev/null;
+	then
+		printf "\n\tYou do not seem to have $1\n"
+		return 1
 	else
 		echo ok
-		found=0
+		return 0
 	fi
-
-	rm check$$.c
-
-	return $found
 }
 
 if [ $1 ]; then
@@ -30,21 +23,27 @@ if [ $1 ]; then
 	echo
 fi
 
-if ! checkinclude libnetfilter_conntrack/libnetfilter_conntrack.h \
-                  libnetfilter_conntrack ftp.netfilter.org; then
+cat > check$$.c <<- EOF
+	int main(){}
+EOF
+	
+if ! checkinclude netfilter_conntrack; then
 	printf "\tIt can be found at ftp.netfilter.org.  "
 	printf "You will also need libnfnetlink.\n"
 	ok=1
 fi
 
-if ! checkinclude libnetfilter_queue/libnetfilter_queue.h \
-                  libnetfilter_queue ftp.netfilter.org; then
+if ! checkinclude netfilter_queue; then
 	printf "\tIt can be found at ftp.netfilter.org.\n"
 	ok=1
 fi
+
+rm check$$.c
 
 echo
 if [[ $ok -eq 0 ]]; then
 	echo Ready to compile.  Say \'make\'.
 	echo
+else
+	echo I found problems, but you could try running 'make' anyway.
 fi

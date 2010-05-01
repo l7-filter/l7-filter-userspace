@@ -1,3 +1,13 @@
+v0.4 - 7 March 2007
+
+Implemented the -m and -c options.  Changed the values of NO_MATCH and 
+NO_MATCH_YET to 1 and 2, respectively.
+
+Made install location configurable.
+
+Changed around the way that ./configure looks for libraries, since the old
+way wasn't working for some people.
+
 v0.3 - 25 Jan 2007
 
 Added man page.

@@ -14,16 +14,26 @@ l7-filter" after installing.
 - Run "make".
 - Run "sudo make install" or similar.
 
+You can pass in a PREFIX to the Makefile to help it find you libraries 
+or to choose a different install location.  For instance:
+
+PREFIX=/usr/ make
+
+looks for libraries in /usr/lib/ instead of /usr/local/lib/ and
+
+PREFIX=/usr/ make install
+
+installs into /usr/bin/ instead of /usr/local/bin/ .
+
 *** Running ***
 
 Make sure you have the ip_conntrack_netlink module loaded or compiled 
 into your kernel.  Run l7-filter:
 
-LD_LIBRARY_PATH=/usr/local/lib ./l7-filter -f configfile
+l7-filter -f configfile
 
-The LD_LIBRARY_PATH part may not be necessary for you.  See 
-sample-l7-filter.conf for the format of the config file. Send traffic to 
-it:
+See sample-l7-filter.conf for the format of the config file. Send 
+traffic to it:
 
 iptables -A FORWARD -j NFQUEUE --queue-num 0
 

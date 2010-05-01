@@ -3,7 +3,7 @@
 #ifndef L7_UTIL_H
 #define L7_UTIL_H
 
-#define L7VERSION 0.2
+#define L7VERSION 0.4
 
 void l7printf(int triviality, const char * format, ...);
 string friendly_print(unsigned char * s, int size);

@@ -24,7 +24,8 @@
 class l7_connection {
  private:
   int num_packets;
-  int mark;
+  unsigned int mark; // this is just our part of the mark, 
+                     // e.g. 0x3 of 0x12345678 if markmask is 0x00f00000
 
   pthread_mutex_t num_packets_mutex;
   pthread_mutex_t buffer_mutex;

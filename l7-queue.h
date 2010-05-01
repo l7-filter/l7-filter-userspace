@@ -20,8 +20,9 @@
 
 #include "l7-conntrack.h"
 
-#define NO_MATCH 65536
-#define NO_MATCH_YET NO_MATCH-1
+#define UNTOUCHED 0
+#define NO_MATCH_YET 1
+#define NO_MATCH 2
 
 class l7_queue {
  private:

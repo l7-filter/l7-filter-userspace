@@ -48,8 +48,7 @@ l7_connection::l7_connection()
 l7_connection::~l7_connection() 
 {
   //clean up stuff
-  if(buffer) 
-  {
+  if(buffer){
     print_give_up(key, (unsigned char *)buffer, lengthsofar);
     free(buffer);
   }
@@ -79,8 +78,10 @@ int l7_connection::get_num_packets()
 u_int32_t l7_connection::classify() 
 {
   pthread_mutex_lock (&buffer_mutex);
-  if (mark == 0 || mark == NO_MATCH_YET)
+  if(mark == NO_MATCH_YET || mark == UNTOUCHED)
     mark = l7_classifier->classify(buffer);
+  else
+    cerr << "NOT REACHED. should have taken care of this case already.\n";
 
   pthread_mutex_unlock (&buffer_mutex);
   return mark;
@@ -112,7 +113,6 @@ void l7_connection::append_to_buffer(char *app_data, int appdatalen)
 
   pthread_mutex_unlock (&buffer_mutex);
 }
-
 
 char *l7_connection::get_buffer() 
 {

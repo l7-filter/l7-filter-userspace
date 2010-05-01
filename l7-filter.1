@@ -25,13 +25,39 @@ Match on up to this many bytes of application layer data.  The default is
 .B -n \fIpackets\fR
 Examine up to this many packets in each connection.  If no match has been
 made after this, l7-filter gives up.  The number of packets counts all packets,
-including the TCP handshake and ACK packets (XXX but not any that l7-filter
-didn't manage to get the conntrack for in time XXX).
+including the TCP handshake and ACK packets (XXX but not any UDP packets that
+l7-filter didn't manage to get the conntrack for in time XXX).
 .TP
 .B -p \fIpath\fR
 Look for patterns in \fIpath\fR instead of the default /etc/l7-protocols.
 The path and its subdirectories are searched, non-recursively 
 (subsubdirectories are not searched).
+.TP
+.B -m \fImask\fR
+Use only the bits of the packet mark specified by the given \fImask\fR. 
+By default, l7-filter uses the whole 32 bit mark, so this is useful if 
+you use other classifiers that set marks. For instance, if you give the 
+mask 0xff000000, l7-filter will only use the first 8 bits of the mark 
+and will completely ignore the rest of it.  In this case, the mark 
+numbers given in the configuration file are mapped onto the mask 
+automatically.  So if the configuration file says 2 and you've
+given the mask 0x00ff0000, l7-filter will actually use 0x00020000.
+
+The mask must be contiguous (not, for instance, 0x00000f0f) and it must 
+be at least 2 bits long.  The number of protocols that l7-filter can 
+handle is 2^(mask length)-3 since it uses the value 0 to detect when a 
+packet has not been examined yet, 1 to mark packets in connections which 
+are unmatched but still being examined, and 2 to mark packets which it 
+has given up trying to identify.
+
+.TP
+.B -c
+l7-filter expects its portion of the packet mark (see -m above) to be
+unmodified by other classifiers.  Normally, if it gets a packet whose mark
+has already been modified (that is, is non-zero) in this region, it
+will send the packet on with the same mark without trying to classify it
+and print an error message.  This option causes l7-filter instead to clobber 
+the existing mark and classify as if it hadn't been there.
 .TP
 .B -s
 Be silent (don't print anything) except in the case of warnings or errors.

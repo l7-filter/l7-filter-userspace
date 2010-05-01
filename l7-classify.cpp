@@ -32,6 +32,12 @@ using namespace std;
 
 string l7dir = "/etc/l7-protocols";
 
+// by default, take the whole thing.
+// The second two are derivable from the first. They're here for convenience.
+unsigned int markmask = 0xffffffff; // the mask itself
+unsigned int maskfirstbit = 0; // how far from the LSB does our region start?
+unsigned int masknbits = 32;
+
 #include "l7-classify.h"
 #include "l7-queue.h"
 #include "l7-parse-patterns.h"
@@ -230,6 +236,7 @@ l7_classify::l7_classify(string filename)
 {
   string line;
   int nrules = 0;
+  int discussedbitusage = 0;
 
   ifstream conf(filename.c_str());
 
@@ -239,6 +246,7 @@ l7_classify::l7_classify(string filename)
     cerr << "Could not read from " << filename << endl;
     exit(1);
   }
+
 
   while(getline(conf, line)){
     stringstream sline;
@@ -261,16 +269,27 @@ l7_classify::l7_classify(string filename)
       continue;
     }
 
-    if(mk < 1 || mk > 65534){
-      cerr << "Ignoring line because the mark is not in the range 1-65534:"
-           << line << endl;
+    if(mk <= 1 || mk >= (markmask >> maskfirstbit) ){
+      cerr << "Ignoring line because the mark is not in the range 3-"
+           << (markmask >> maskfirstbit) << ":\n" << line << endl;
+      if(!discussedbitusage){
+        cerr << "Your mask allows me to use " << masknbits 
+             << " bits, and the values 0, 1 and 2 have special meanings.\n";
+        discussedbitusage = 1;
+      }
       continue;
     }
 
     patternfile = findpatternfile(proto);
+
     if(add_pattern_from_file(patternfile, mk)){
       nrules++;
-      l7printf(0, "Added: %s\tmark=%d\n", proto.c_str(), mk);
+      if(markmask == 0xffffffff)
+        l7printf(0, "Added: %s\tmark=%d\n", proto.c_str(), mk);
+      else
+        l7printf(0, "Added: %s\tGiven mark=%d\t"
+                    "Actual mark (after applying mask)=%#08x\n",
+                    proto.c_str(), mk, (mk << maskfirstbit));
     }
   }
 

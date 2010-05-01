@@ -50,6 +50,10 @@ extern int verbosity;
 extern int buflen;
 extern int maxpackets;
 extern string l7dir;
+extern unsigned int markmask;
+extern unsigned int maskfirstbit;
+extern unsigned int masknbits;
+extern int clobbermark;
 
 static void handle_sigint(int s) {
   // was there a reason for this?  It just makes it crash on Ctrl-C for me.
@@ -94,7 +98,7 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 }
 
 static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
-              struct nfq_data *nfa, void *data) 
+  struct nfq_data *nfa, void *data) 
 {
   u_int32_t id = print_pkt(nfa);
   l7printf(3, "entering callback\n");
@@ -115,14 +119,44 @@ static void * start_queue_thread(void * qnum)
   pthread_exit(NULL);
 }
 
+// Checks whether the given mask has all its 1's in a row
+// and that it has enough room to work in
+static int checkandparsemask(const unsigned int mask)
+{
+  int i = 0;
+  masknbits = 0;
+
+  // it can start with 0 or more 0's
+  while((mask >> i)%2 == 0){
+    i++;
+    if(i >= 32) return false; // it's all zeros!
+  }  
+
+  maskfirstbit = i;
+
+  // followed by 0 or more 1's
+  while((mask >> i)%2 == 1){ 
+    masknbits++;
+    i++;
+  } 
+  if(masknbits < 2) return false; // need at least two bits to work with
+
+  // the rest has to be all 0's
+  for(; i < 32; i++)
+    if((mask >> i)%2 == 1)
+      return false;
+
+  return true;
+}
+
 static void handle_cmdline(int & qnum, string & conffilename, 
-	int argc, char ** argv)
+  int argc, char ** argv)
 {
   int dumb = 0; // whether to allow dumb things
   qnum = 0; // default
   buflen = 8*1500; //default (8 large packets worth)
   conffilename = ""; 
-  const char *opts = "f:q:vh?sb:dn:p:";
+  const char *opts = "f:q:vh?sb:dn:p:m:c";
 
   int done = 0;
   while(!done)
@@ -157,7 +191,7 @@ static void handle_cmdline(int & qnum, string & conffilename,
         }
         break;
       case 'n':
-        maxpackets = strtol(optarg, 0, 10);
+        maxpackets = strtoll(optarg, 0, 10);
         // never allow maxpackets to be less than one.
         // Allow it to be outside of the range 3-16 only if -d is given
         if(maxpackets == LONG_MIN || maxpackets == LONG_MAX || maxpackets < 1 ||
@@ -169,6 +203,23 @@ static void handle_cmdline(int & qnum, string & conffilename,
           exit(1);
         }
         break;
+      case 'm':
+	markmask = strtoll(optarg, 0, 0);
+        if(errno == ERANGE){
+          cerr << "You seem to have given me a bogus mask.\n";
+          exit(1);
+        }
+	if(!checkandparsemask(markmask)){
+          cerr<<"I can only handle masks in which the asserted bits are "
+                "contiguous\n"
+                "For example: 0x0000fff0, but not 0xf000f000.\n"
+                "I also need at least two bits to work with.\n";
+          exit(1);
+        }
+        break; 
+      case 'c':
+        clobbermark = 1;
+        break;       
       case 'v':
         verbosity++;
         break;
@@ -197,6 +248,8 @@ static void handle_cmdline(int & qnum, string & conffilename,
           "-b bytes\tStore up to this many bytes of data per connection\n"
           "-n packets\tExamine up to this many packets per connection\n"
           "-p path\t\tLook for patterns in path instead of /etc/l7-protocols\n"
+          "-m mask\t\tOnly pay look at and set the given bits of marks\n"
+          "-c\t\tClobber existing marks instead of passing them unmodified\n"
           "-d\t\tAllow configurations that are probably ill-advised\n"
           "\n"
           "See also 'man l7-filter'\n";

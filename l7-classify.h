@@ -30,7 +30,8 @@ using namespace std;
 class l7_pattern {
 
  private:
-  int mark;
+  int mark; // this is the mark as it appears in the config file
+            // before it goes to netfilter, it will get modified by the mask
   string pattern_string;
   int eflags; // for regexec
   int cflags; // for regcomp

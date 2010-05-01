@@ -1,19 +1,13 @@
 For bringing this version up to speed with the kernel version and basic sanity:
 
-- Make child connections (FTP, IRC, etc.) work.
+- Make child connections (FTP, IRC, etc.) work.  This appears to be 
+difficult. Can it be handled with iptables rules instead?  Doesn't 
+really seem like it.
 
 - Catch first packet of UDP "connections".
 
-- Make install location configurable.
-
 - Are ^ and $ handled sensibly?  It seems so, yet the testing suite has 
 some sort of quirk about newlines.
-
-
-Easy nice things to add:
-
-- Allow configuration of what marks NO_MATCH and NO_MATCH_YET get.
-
 
 Things to work on after v1.0:
 
@@ -22,3 +16,5 @@ Things to work on after v1.0:
 - Make a mechanism for selecting non-default patterns, such as patterns 
 which are faster or more accurate than the default.
 
+- Allow pattern files to specify that l7-filter should use a compiled in 
+function for matching instead of a regular expression.
