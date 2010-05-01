@@ -1,3 +1,8 @@
+v0.11 - 26 Feb 2009
+
+Fixed compilation problem by moving include of <linux/netfilter.h> after 
+<linux/types.h> and <netinet/in.h> as suggested by Norbert Harrer.
+
 v0.10 - 27 Sept 2008
 
 Added some #includes that aledr says makes it compile for him.  (It 

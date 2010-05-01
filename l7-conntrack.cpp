@@ -24,9 +24,9 @@ using namespace std;
 #include <cstring>
 
 extern "C" {
-#include <linux/netfilter.h>
 #include <linux/types.h>
 #include <netinet/in.h>
+#include <linux/netfilter.h>
 #include <libnetfilter_conntrack/libnetfilter_conntrack.h>
 }
 

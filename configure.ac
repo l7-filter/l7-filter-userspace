@@ -1,10 +1,10 @@
 #
 #
-# Created by Daniel Black <dragonheart@gentoo.org> for the l7-filter projects
+# Created by Daniel Black <dragonheart@gentoo.org> for the l7-filter project
 #
 
 AC_PREREQ(2.61)
-AC_INIT(l7-filter-userspace, [0.10], [http://sourceforge.net/tracker/?group_id=80085])
+AC_INIT(l7-filter-userspace, [0.11], [http://sourceforge.net/tracker/?group_id=80085])
 AC_CONFIG_SRCDIR([l7-queue.h])
 
 AC_CANONICAL_TARGET
