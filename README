@@ -16,16 +16,13 @@ l7-filter" after installing.
 - Run "make".
 - Run "sudo make install" or similar.
 
-You can pass in a PREFIX to the Makefile to help it find you libraries 
-or to choose a different install location.  For instance:
+To choose a different install location use the options on configure.
+For instance:
 
-PREFIX=/usr/ make
+./configure --prefix=/usr
 
-looks for libraries in /usr/lib/ instead of /usr/local/lib/ and
-
-PREFIX=/usr/ make install
-
-installs into /usr/bin/ instead of /usr/local/bin/ .
+This will install the l7-filter executable in /usr/bin/ rather than
+/usr/local/bin
 
 *** Running ***
 

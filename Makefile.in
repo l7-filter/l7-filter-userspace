@@ -191,7 +191,7 @@ top_srcdir = @top_srcdir@
 
 # Created by Daniel Black <dragonheart@gentoo.org> for the l7-filter projects
 #
-DOCS = sample-l7-filter.conf TODO BUGS README
+EXTRA_DIST = sample-l7-filter.conf TODO BUGS README
 AM_CXXFLAGS = $(NFNETLINK_CFLAGS)
 l7_filter_SOURCES = l7-classify.cpp l7-queue.cpp l7-conntrack.cpp  l7-filter.cpp l7-parse-patterns.cpp  util.cpp
 l7_filter_LDADD = $(NFNETLINK_LIBS)

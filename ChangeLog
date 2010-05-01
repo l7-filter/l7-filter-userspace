@@ -1,3 +1,12 @@
+v0.8 - 1 Sept 2008
+
+Implemented nfq_unbind_pf workaround so l7-filter works again with newer 
+kernels.  Added warning if {nf,ip}_conntrack_ipv4 is not loaded.
+
+Fixed version number and document install.  Fixed documentation.
+
+Reduced compiler warnings with newer gcc.
+
 v0.7 - 29 June 2008
 
 Made compatible with gcc 4.3, courtesy of Peter Alfredsen, loki_val at 

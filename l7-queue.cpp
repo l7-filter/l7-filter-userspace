@@ -111,7 +111,11 @@ void l7_queue::start(int queuenum)
   }
 
   l7printf(3, "unbinding existing nf_queue handler for AF_INET (if any)\n");
-  if(nfq_unbind_pf(h, AF_INET) < 0) {
+
+  /* As per Patrick McHardy's suggestion at 
+     http://www.spinics.net/lists/netfilter/msg42063.html
+     we, for now, ignore the return value of nfq_unbind_pf() */
+  if(nfq_unbind_pf(h, AF_INET) < 0 && 0) {
     cerr << "error during nfq_unbind_pf()\n";
     exit(1);
   }

@@ -157,7 +157,7 @@ static char ** readl7dir(string dirname)
   char ** subdirs = (char **)malloc(MAX_SUBDIRS * sizeof(char *));
 
   int n, d = 1;
-  subdirs[0] = "";
+  subdirs[0] = ""; // generates warning with newer gcc versions
 
   n = scandir(dirname.c_str(), &namelist, 0, alphasort);
 

@@ -4,7 +4,7 @@
 #
 
 AC_PREREQ(2.61)
-AC_INIT(l7-filter-userspace, [0.5], [http://sourceforge.net/tracker/?group_id=80085])
+AC_INIT(l7-filter-userspace, [0.8], [http://sourceforge.net/tracker/?group_id=80085])
 AC_CONFIG_SRCDIR([l7-queue.h])
 
 AC_CANONICAL_TARGET

@@ -1,6 +1,6 @@
 # Created by Daniel Black <dragonheart@gentoo.org> for the l7-filter projects
 #
-DOCS = sample-l7-filter.conf TODO BUGS README
+EXTRA_DIST = sample-l7-filter.conf TODO BUGS README
 
 bin_PROGRAMS = l7-filter
 

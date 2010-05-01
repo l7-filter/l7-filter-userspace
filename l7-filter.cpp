@@ -171,15 +171,14 @@ static void handle_cmdline(int & qnum, string & conffilename,
         break;
       case 'q':
         qnum = strtol(optarg, 0, 10);
-        if(qnum == LONG_MIN || qnum == LONG_MAX || qnum < 0 || qnum > 65535){
+        if(qnum < 0 || qnum > 65535){
           cerr << "Queue number is out of range. Valid numbers are 0-65535.\n";
           exit(1);
         }
         break;
       case 'b':
         buflen = strtol(optarg, 0, 10);
-        if(buflen == LONG_MIN || buflen == LONG_MAX || 
-	   ((buflen < 1 || buflen > 65535) && !dumb)){
+        if((buflen < 1 || buflen > 65535) && !dumb){
           cerr << "Buffer length is out of range or you gave me a non-number.\n"
             "Valid lengths are 0-65535. (65535 is an arbitrary limit. If you\n"
             "are sure you need more, use the -d switch before this one.)\n";
@@ -190,8 +189,7 @@ static void handle_cmdline(int & qnum, string & conffilename,
         maxpackets = strtoll(optarg, 0, 10);
         // never allow maxpackets to be less than one.
         // Allow it to be outside of the range 3-16 only if -d is given
-        if(maxpackets == LONG_MIN || maxpackets == LONG_MAX || maxpackets < 1 ||
-           ((maxpackets < 3 || maxpackets > 16) && !dumb)){
+        if(maxpackets < 1 || ((maxpackets < 3 || maxpackets > 16) && !dumb)){
           cerr << "The number of packets is out of range or you gave me a\n"
                   "non-number. Valid number are between 3 and 16. Or if you\n"
                   "give the -d option before this one, I'll allow any\n"
@@ -281,15 +279,39 @@ static int check_for_module(string mod)
 
 static void check_requirements()
 {
+  int sleepabit = 0;
+
   if(!check_for_module("ip_conntrack_netlink") && 
      !check_for_module("nf_conntrack_netlink"))
   {
-    cerr << "\n                      ***WARNING***\n"
-     "Neither ip_conntrack_netlink nor nf_conntrack_netlink appears to be\n"
-     "loaded. Unless one is compiled into your kernel, please load one and\n"
-     "run l7-filter again.\n\n";
-    sleep(5); // give time for the user to notice the above.
+    cerr <<
+    "\n                      ***WARNING***\n";
+    cerr <<
+    "Neither the ip_conntrack_netlink nor nf_conntrack_netlink kernel\n";
+    cerr <<
+    "modules are loaded. Unless these features are compiled into your\n";
+     cerr <<
+    "kernel, please load one and run l7-filter again.\n\n";
+
+    sleepabit = 1;
   }
+
+  if(!check_for_module("nf_conntrack_ipv4") &&
+     !check_for_module("ip_conntrack_ipv4"))
+  {
+    cerr <<
+    "\n                      ***WARNING***\n";
+    cerr <<
+    "Neither the ip_conntrack_ipv4 nor nf_conntrack_ipv4 kernel modules\n";
+    cerr <<
+    "are loaded.  Unless these features are compiled into your kernel,\n";
+    cerr <<
+    "please load one and run l7-filter again.\n\n";
+
+    sleepabit = 1;
+  }
+
+  if(sleepabit) sleep(3); // Give the user a chance to see the warnings
 }
 
 int main(int argc, char **argv) 
