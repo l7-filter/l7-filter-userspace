@@ -52,6 +52,7 @@ class l7_conntrack {
   l7_map l7_connections;
   struct nfct_conntrack *ct;
   struct nfct_handle *cth; // the callback
+  pthread_mutex_t map_mutex;
 
  public:
   l7_conntrack(void * foo);

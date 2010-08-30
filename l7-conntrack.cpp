@@ -195,10 +195,12 @@ l7_conntrack::~l7_conntrack()
 {
   nfct_conntrack_free(ct);
   nfct_close(cth);
+  pthread_mutex_destroy(&map_mutex);
 }
 
 l7_conntrack::l7_conntrack(void* l7_classifier_in) 
 {
+  pthread_mutex_init(&map_mutex, NULL);
   l7_classifier = (l7_classify *)l7_classifier_in;
   
   // Now open a handler that is subscribed to all possible events
@@ -211,19 +213,27 @@ l7_conntrack::l7_conntrack(void* l7_classifier_in)
 
 l7_connection *l7_conntrack::get_l7_connection(const string key) 
 {
-  return l7_connections[key];
+  l7_connection *conn;
+  pthread_mutex_lock(&map_mutex);
+  conn = l7_connections[key];
+  pthread_mutex_unlock(&map_mutex);
+  return conn;
 }
 
 void l7_conntrack::add_l7_connection(l7_connection* connection, 
 					const string key) 
 {
+  pthread_mutex_lock(&map_mutex);
   l7_connections[key] = connection;
+  pthread_mutex_unlock(&map_mutex);
 }
 
 void l7_conntrack::remove_l7_connection(const string key) 
 {
+  pthread_mutex_lock(&map_mutex)
   delete l7_connections[key];
   l7_connections.erase(l7_connections.find(key));
+  pthread_mutex_unlock(&map_mutex);
 }
 
 void l7_conntrack::start() 
