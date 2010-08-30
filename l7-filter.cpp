@@ -186,15 +186,11 @@ static void handle_cmdline(int & qnum, string & conffilename,
   conffilename = ""; 
   const char *opts = "f:q:vh?sb:dn:p:m:cz";
 
-  int done = 0;
-  while(!done)
+  int c;
+  while ((c = getopt (argc, argv, opts)) != -1)
   {
-    char c;
-    switch(c = getopt(argc, argv, opts))
+    switch(c)
     {
-      case -1:
-        done = 1;
-        break;
       case 'f':
         conffilename = optarg;
         break;
