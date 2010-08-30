@@ -59,6 +59,7 @@ l7_pattern::l7_pattern(string name, string pattern_string, int eflags,
     cerr << "error compiling " << name << " -- " << pattern_string << endl;
     exit(1);
   }
+  free(preprocessed);
 }
 
 
