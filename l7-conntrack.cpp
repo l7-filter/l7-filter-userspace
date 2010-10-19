@@ -230,7 +230,7 @@ void l7_conntrack::add_l7_connection(l7_connection* connection,
 
 void l7_conntrack::remove_l7_connection(const string key) 
 {
-  pthread_mutex_lock(&map_mutex)
+  pthread_mutex_lock(&map_mutex);
   delete l7_connections[key];
   l7_connections.erase(l7_connections.find(key));
   pthread_mutex_unlock(&map_mutex);
