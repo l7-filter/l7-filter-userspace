@@ -50,7 +50,6 @@ typedef map <string, l7_connection *> l7_map;
 class l7_conntrack {
  private:
   l7_map l7_connections;
-  struct nfct_conntrack *ct;
   struct nfct_handle *cth; // the callback
   pthread_mutex_t map_mutex;
 
@@ -58,6 +57,7 @@ class l7_conntrack {
   l7_conntrack(void * foo);
   ~l7_conntrack();
   void start();
+  string make_key(const unsigned char *packetdata, bool reverse) const;
   l7_connection* get_l7_connection(const string key);
   void add_l7_connection(l7_connection *connection, const string key);
   void remove_l7_connection(const string key);

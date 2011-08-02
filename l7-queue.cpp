@@ -167,7 +167,7 @@ u_int32_t l7_queue::handle_packet(nfq_data * tb, struct nfq_q_handle *qh)
   int id = 0, ret, dataoffset, datalen;
   u_int32_t wholemark, mark, ifi; 
   struct nfqnl_msg_packet_hdr *ph;
-  char * data;
+  unsigned char * data;
   l7_connection * connection;
 
   ph = nfq_get_msg_packet_hdr(tb);
@@ -205,11 +205,11 @@ u_int32_t l7_queue::handle_packet(nfq_data * tb, struct nfq_q_handle *qh)
   if(ip_protocol != IPPROTO_TCP && ip_protocol != IPPROTO_UDP)
     return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 
-  dataoffset = app_data_offset((const unsigned char*)data);
+  dataoffset = app_data_offset(data);
   datalen = ret - dataoffset;
 
   //find the conntrack 
-  string key = get_conntrack_key((const unsigned char*)data, false);
+  string key = l7_connection_tracker->make_key(data, false);
   connection = l7_connection_tracker->get_l7_connection(key);
   
   if(connection)
@@ -217,7 +217,7 @@ u_int32_t l7_queue::handle_packet(nfq_data * tb, struct nfq_q_handle *qh)
 
   if(!connection){
     //find the conntrack (backwards)
-    string key = get_conntrack_key((const unsigned char*)data, true);
+    string key = l7_connection_tracker->make_key(data, true);
     connection = l7_connection_tracker->get_l7_connection(key);
   
     if(connection)
@@ -280,57 +280,6 @@ u_int32_t l7_queue::handle_packet(nfq_data * tb, struct nfq_q_handle *qh)
   l7printf(4,"Set verdict ACCEPT, mark %#08x\n",(mark<<maskfirstbit)|wholemark);
   return nfq_set_verdict_mark(qh, id, NF_ACCEPT, 
                               htonl((mark<<maskfirstbit)|wholemark), 0, NULL);
-}
-
-// Returns a string that uniquely defines the connection
-string l7_queue::get_conntrack_key(const unsigned char *data, bool reverse) 
-{
-  char * buf = (char *)malloc(256);
-  int ip_hl = 4*(data[0] & 0x0f);
-  char ip_protocol = data[9];
-
-  if(ip_protocol == IPPROTO_TCP){
-    if(reverse){
-      snprintf(buf, 255, 
-              "tcp      6 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
-	      data[12], data[13], data[14], data[15],
-	      data[16], data[17], data[18], data[19],
-	      data[ip_hl]*256+data[ip_hl+1], data[ip_hl+2]*256+data[ip_hl+3]);
-    }
-    else{
-      snprintf(buf, 255, 
-              "tcp      6 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
-	      data[16], data[17], data[18], data[19],
-	      data[12], data[13], data[14], data[15],
-	      data[ip_hl+2]*256+data[ip_hl+3], data[ip_hl]*256+data[ip_hl+1]);
-    }
-  }
-  else if(ip_protocol == IPPROTO_UDP){
-    if(reverse){
-      snprintf(buf, 255, 
-              "udp      17 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
-	      data[12], data[13], data[14], data[15],
-	      data[16], data[17], data[18], data[19],
-	      data[ip_hl]*256+data[ip_hl+1], data[ip_hl+2]*256+data[ip_hl+3]);
-    }
-    else{
-      snprintf(buf, 255, 
-              "udp      17 src=%d.%d.%d.%d dst=%d.%d.%d.%d sport=%d dport=%d",
-	      data[16], data[17], data[18], data[19],
-	      data[12], data[13], data[14], data[15],
-	      data[ip_hl+2]*256+data[ip_hl+3], data[ip_hl]*256+data[ip_hl+1]);
-    }
-  }
-  else{
-    l7printf(0, "Tried to get conntrack key for unsupported protocol!\n");
-    buf[0] = '\0';
-  }
-  string answer = buf;
-  free(buf);
-
-  l7printf(3, "Made key from packet:\t%s\n", answer.c_str());
-
-  return answer;
 }
 
 /* Returns offset the into the skb->data that the application data starts */

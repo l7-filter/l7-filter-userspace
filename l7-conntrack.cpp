@@ -26,6 +26,7 @@ using namespace std;
 extern "C" {
 #include <linux/types.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>
 #include <linux/netfilter.h>
 #include <libnetfilter_conntrack/libnetfilter_conntrack.h>
 }
@@ -121,79 +122,115 @@ char *l7_connection::get_buffer()
   return (char *)buffer;
 }
 
-static int sprintf_conntrack_key(char *buf, struct nfct_conntrack *ct, 
-                          unsigned int flags) 
-{
-  int size = 0;
-
-  size += nfct_sprintf_protocol(buf, ct);
-  size += nfct_sprintf_address(buf+size, &ct->tuple[NFCT_DIR_ORIGINAL]);
-  size += nfct_sprintf_proto(buf+size, &ct->tuple[NFCT_DIR_ORIGINAL]);
-
-  /* Delete the last blank space */
-  buf[size-1] = '\0';
-
-  return size;
-}
-
-static string make_key(nfct_conntrack* ct, int flags)
+static string make_key4(u_int32_t a, u_int32_t b, u_int16_t s,
+			u_int16_t d, u_int8_t p)
 {
   char key[512];
-  int keysize = sprintf_conntrack_key(key, ct, flags);
+
+  if (p != IPPROTO_TCP  && p != IPPROTO_UDP) {
+	l7printf(0, "Tried to get conntrack key for unsupported protocol!\n");
+	return "";
+  }
+  int keysize  = snprintf(key, sizeof(key), "%08x:%04x-%08x:%04x %02x", a, s, b, d, p);
   if(keysize >= 512){
     cerr << "Yike! Overflowed key!\n";
     exit(1);
   }
-  l7printf(2, "Made key from ct:\t%s\n", key);
   return key;
 }
 
-static int l7_handle_conntrack_event(void *arg, unsigned int flags, int type, 
+static string make_key_from_ct(const nf_conntrack* ct)
+{
+	u_int32_t src4 = nfct_get_attr_u32(ct, ATTR_ORIG_IPV4_SRC);
+	u_int32_t dst4 = nfct_get_attr_u32(ct, ATTR_ORIG_IPV4_DST);
+	u_int16_t srcport = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC);
+	u_int16_t dstport = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_DST);
+	u_int8_t l4proto = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
+
+	string key = make_key4(src4, dst4, srcport, dstport, l4proto);
+	l7printf(2, "Made key from ct:\t%s\n", key.c_str());
+	return key;
+}
+
+static int l7_handle_conntrack_event(const struct nlmsghdr *nlh,
+					enum nf_conntrack_msg_type type,
+					struct nf_conntrack *ct,
 					void *data)
 {
   l7_conntrack * l7_conntrack_handler = (l7_conntrack *) data;
-
-  nfct_conntrack* ct = (nfct_conntrack*)arg;
+  u_int8_t l4proto = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
 
   // I don't think there is any demand for ICMP. These are enough work for now.
-  if(ct->tuple[0].protonum != IPPROTO_TCP && 
-     ct->tuple[0].protonum != IPPROTO_UDP) return 0;
+  if (l4proto != IPPROTO_TCP && l4proto != IPPROTO_UDP)
+     return 0;
 
-  if(type == NFCT_MSG_DESTROY) l7printf(3, "Got event: NFCT_MSG_DESTROY\n");
-  if(type == NFCT_MSG_NEW)     l7printf(3, "Got event: NFCT_MSG_NEW\n");
-  if(type == NFCT_MSG_UPDATE)  l7printf(3, "Got event: NFCT_MSG_UPDATE\n");
-  if(type == NFCT_MSG_UNKNOWN) l7printf(3, "Got event: NFCT_MSG_UNKNOWN\n");
-
+  std::string key;
+  switch (type) {
   // On the first packet, create the connection buffer, etc.
-  if(type == NFCT_MSG_NEW){
-    string key = make_key(ct, flags);
-    if (l7_conntrack_handler->get_l7_connection(key)){
-      // this happens sometimes
-      cerr << "Received NFCT_MSG_NEW but already have a connection. Packets = " 
-           << l7_conntrack_handler->get_l7_connection(key)->get_num_packets() 
-           << endl;
-      l7_conntrack_handler->remove_l7_connection(key);
-    }
-    
-    l7_connection *thisconnection = new l7_connection();
-    l7_conntrack_handler->add_l7_connection(thisconnection, key);
-    thisconnection->key = key;
+  case NFCT_T_NEW: {
+	l7printf(3, "Got event: NFCT_T_NEW\n");
+
+	key = make_key_from_ct(ct);
+	if (l7_conntrack_handler->get_l7_connection(key)){
+	// this happens sometimes
+		cerr << "Received NFCT_MSG_NEW but already have a connection. Packets = " 
+			<< l7_conntrack_handler->get_l7_connection(key)->get_num_packets() 
+		        << endl;
+		l7_conntrack_handler->remove_l7_connection(key);
+	}
+	l7_connection *thisconnection = new l7_connection();
+	l7_conntrack_handler->add_l7_connection(thisconnection, key);
+	thisconnection->key = key;
   }
-  else if(type == NFCT_MSG_DESTROY){
-    // clean up the connection buffer, etc.
-    string key = make_key(ct, flags);
-    if(l7_conntrack_handler->get_l7_connection(key)){
-      l7_conntrack_handler->remove_l7_connection(key);
-    }
+  break;
+  case NFCT_T_DESTROY:
+	l7printf(3, "Got event: NFCT_T_DESTROY\n");
+	// clean up the connection buffer, etc.
+	key = make_key_from_ct(ct);
+	if (l7_conntrack_handler->get_l7_connection(key))
+		l7_conntrack_handler->remove_l7_connection(key);
+	break;
+  case NFCT_T_UPDATE:
+	l7printf(3, "Got event: NFCT_T_UPDATE\n");
+	break;
+  /* FIXME: this MUST be handled properly: */
+  case NFCT_T_ERROR:
+	l7printf(3, "Got event: NFCT_T_ERROR\n");
+	break;
+  default:
+	l7printf(1, "Got event type: 0x%x\n", type);
+	break;
   }
-	
-  return 0;
+ return 0;
 }
 
+// turn raw packet into a key string
+string l7_conntrack::make_key(const unsigned char *packetdata, bool reverse) const
+{
+	u_int16_t sport, dport;
+	unsigned int ihl;
+	struct iphdr iph;
+	string key;
+
+	memcpy(&iph, packetdata, sizeof(iph));
+
+	ihl = iph.ihl << 2;
+	memcpy(&sport, packetdata + ihl, sizeof(sport));
+	memcpy(&dport, packetdata + ihl + 2, sizeof(dport));
+
+	if (reverse)
+		key = make_key4(iph.daddr, iph.saddr,
+				dport, sport, iph.protocol);
+	else
+		key = make_key4(iph.saddr, iph.daddr,
+				 sport, dport, iph.protocol);
+
+	l7printf(3, "Made key from packet:\t%s\n", key.c_str());
+	return key;
+}
 
 l7_conntrack::~l7_conntrack() 
 {
-  nfct_conntrack_free(ct);
   nfct_close(cth);
   pthread_mutex_destroy(&map_mutex);
 }
@@ -240,9 +277,11 @@ void l7_conntrack::start()
 {
   int ret;
 
-  nfct_register_callback(cth, l7_handle_conntrack_event, (void *)this);
-  ret = nfct_event_conntrack(cth); // this is the main loop
-  
-  nfct_close(cth);
-  nfct_conntrack_free(ct);
+  nfct_callback_register2(cth, NFCT_T_ALL, l7_handle_conntrack_event, (void *)this);
+  do {
+	  ret = nfct_catch(cth);
+  }  while (ret == 0);
+
+  std::cerr <<  "nfct_catch returned " << ret << ", exiting" << std::endl;
+  exit(ret);
 }

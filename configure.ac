@@ -1,10 +1,11 @@
 #
 #
 # Created by Daniel Black <dragonheart@gentoo.org> for the l7-filter project
+# Updated by Darryl Sokoloski <dsokoloski@clearfoundation.com>
 #
 
 AC_PREREQ(2.61)
-AC_INIT(l7-filter-userspace, [0.11], [http://sourceforge.net/tracker/?group_id=80085])
+AC_INIT(l7-filter-userspace, [0.13], [http://l7-filter.clearfoundation.com/tracker/main_page.php])
 AC_CONFIG_SRCDIR([l7-queue.h])
 
 AC_CANONICAL_TARGET
@@ -46,5 +47,5 @@ AC_TYPE_SIGNAL
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([regcomp strerror strtol])
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile l7-filter-userspace.spec])
 AC_OUTPUT

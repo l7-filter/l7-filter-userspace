@@ -1,3 +1,14 @@
+v0.13 - 2 Aug 2011
+
+Applied libnetfilter_conntrack (>= 0.0.100) patch from Florian Westphal.
+
+Fixed illegal cast from char* to unsigned char*, changed "data" variable from
+char* to unsigned char* -- removed redundant casts in: l7_queue.c
+
+Added RPM spec, init, and ClearFoundation patches to repository.
+
+Updated autoconf/automake files, added autogen.sh to rebuild said files.
+
 v0.12 - 30 Aug 2010
 
 Added l7_connections map access locking patch from James King.

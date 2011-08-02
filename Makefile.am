@@ -1,6 +1,6 @@
 # Created by Daniel Black <dragonheart@gentoo.org> for the l7-filter projects
 #
-EXTRA_DIST = sample-l7-filter.conf TODO BUGS README
+EXTRA_DIST = sample-l7-filter.conf l7-filter.init l7-filter-userspace-0.10-protocols.patch l7-filter-userspace-0.10-quiet.patch TODO BUGS README l7-classify.h l7-conntrack.h l7-parse-patterns.h l7-queue.h util.h
 
 bin_PROGRAMS = l7-filter
 
