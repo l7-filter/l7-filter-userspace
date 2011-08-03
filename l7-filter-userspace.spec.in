@@ -1,0 +1,63 @@
+Name: @PACKAGE_TARNAME@
+Version: @PACKAGE_VERSION@
+Release: 1%{dist}
+Vendor: ClearFoundation
+License: GPL
+Group: System Environment/Daemons
+Packager: ClearFoundation
+Summary: Application Layer Packet Classifier for Linux
+URL: http://l7-filter.clearfoundation.com/
+Requires: l7-protocols
+Patch1: l7-filter-userspace-0.10-protocols.patch
+Patch2: l7-filter-userspace-0.10-quiet.patch
+Source: l7-filter-userspace-%{version}.tar.gz
+Source1: l7-filter.init
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+
+BuildRequires: libnfnetlink-devel, libnetfilter_conntrack-devel, libnetfilter_queue-devel, pkgconfig
+
+%description
+L7-filter is a classifier for Linux's Netfilter that identifies packets based on application layer data. It can classify packets as Kazaa, HTTP, Jabber, Citrix, Bittorrent, FTP, Gnucleus, eDonkey2000, etc., regardless of port. It complements existing classifiers that match on IP address, port numbers and so on.  Our intent is for l7-filter to be used in conjunction with Linux QoS to do bandwith arbitration ("packet shaping") or traffic accounting.
+Report bugs to: @PACKAGE_BUGREPORT@
+
+%prep
+%setup
+%patch1 -p1
+%patch2 -p1
+
+%build
+%configure
+%{__make} %{?_smp_mflags}
+
+%install
+%{__rm} -rf %{buildroot}
+%{__make} install DESTDIR="%{buildroot}"
+mkdir -p %{buildroot}%{_sysconfdir}/l7-filter
+cp sample-l7-filter.conf %{buildroot}%{_sysconfdir}/l7-filter/l7-filter.conf
+mkdir -p %{buildroot}%{_sysconfdir}/rc.d/init.d
+cp %{SOURCE1} %{buildroot}%{_sysconfdir}/rc.d/init.d/l7-filter
+
+%clean
+%{__rm} -rf %{buildroot}
+
+%post
+/sbin/chkconfig --add l7-filter
+if [ "$1" -ge "1" ]; then
+	/sbin/service l7-filter condrestart >/dev/null 2>&1 || :
+fi
+exit 0
+
+%preun
+if [ $1 = 0 ] ; then
+    /sbin/service l7-filter stop >/dev/null 2>&1 || :
+	/sbin/chkconfig --del l7-filter
+fi
+exit 0
+
+%files
+%defattr(-, root, root, 0755)
+%doc COPYING
+%{_bindir}/l7-filter
+%{_mandir}/man1/l7-filter.1.gz
+%config %{_sysconfdir}/l7-filter/l7-filter.conf
+%attr(0755,root,root) %{_sysconfdir}/rc.d/init.d/l7-filter

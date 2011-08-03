@@ -1,0 +1,78 @@
+#!/bin/bash
+#
+# l7-filter: Start/Stop the l7-filter daemon.
+#
+# chkconfig: 2345 90 60
+# description: Application Layer Packet Classifier for Linux
+# processname: l7-filter
+# config: /etc/l7-filter/l7-filter.conf
+
+# Source function library.
+. /etc/init.d/functions
+
+prog="l7-filter"
+RETVAL=0
+L7_FILTER_PID="/var/run/l7-filter.pid"
+L7_FILTER_CONF="/etc/l7-filter/l7-filter.conf"
+
+# See how we were called.
+start() {
+	echo -n $"Starting $prog: "
+	/sbin/modprobe ip_conntrack_netlink
+	daemon /usr/bin/$prog -f $L7_FILTER_CONF -z -s
+	RETVAL=$?
+	echo
+	if [ $RETVAL -eq 0 ]; then
+		touch /var/lock/subsys/$prog
+	fi
+	return $RETVAL
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+	killproc $prog
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && rm -f $L7_FILTER_PID /var/lock/subsys/$prog
+	return $RETVAL
+}	
+
+restart() {
+  	stop
+	start
+}	
+
+reload() {
+	echo -n $"Reloading $prog configuration: "
+	killproc $prog -HUP
+	RETVAL=$?
+	echo
+	return $RETVAL
+}	
+
+case "$1" in
+  start)
+  	start
+	;;
+  stop)
+  	stop
+	;;
+  restart)
+  	restart
+	;;
+  reload)
+  	reload
+	;;
+  status)
+	status $prog
+	exit $?
+	;;
+  condrestart)
+  	[ -f /var/lock/subsys/$prog ] && restart || :
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|status|reload|restart|condrestart}"
+	exit 1
+esac
+
+exit $?

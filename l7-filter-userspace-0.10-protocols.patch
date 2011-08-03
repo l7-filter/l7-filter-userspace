@@ -1,0 +1,24 @@
+diff -ru l7-filter-userspace-0.10/l7-classify.cpp l7-filter-userspace-0.10-l7-protocols/l7-classify.cpp
+--- l7-filter-userspace-0.10/l7-classify.cpp	2008-09-27 03:08:23.000000000 -0400
++++ l7-filter-userspace-0.10-l7-protocols/l7-classify.cpp	2008-12-16 15:43:39.000000000 -0500
+@@ -31,7 +31,7 @@
+ #define MAX_SUBDIRS 128
+ #define MAX_FN_LEN 256
+ 
+-string l7dir = "/etc/l7-protocols";
++string l7dir = "/etc/l7-filter/protocols";
+ 
+ // by default, take the whole thing.
+ // The second two are derivable from the first. They're here for convenience.
+diff -ru l7-filter-userspace-0.10/l7-filter.cpp l7-filter-userspace-0.10-l7-protocols/l7-filter.cpp
+--- l7-filter-userspace-0.10/l7-filter.cpp	2008-09-27 03:14:14.000000000 -0400
++++ l7-filter-userspace-0.10-l7-protocols/l7-filter.cpp	2008-12-16 15:42:53.000000000 -0500
+@@ -276,7 +276,7 @@
+           "-s\t\tBe silent except in the case of warnings and errors\n"
+           "-b bytes\tStore up to this many bytes of data per connection\n"
+           "-n packets\tExamine up to this many packets per connection\n"
+-          "-p path\t\tLook for patterns in path instead of /etc/l7-protocols\n"
++          "-p path\t\tLook for patterns in path instead of /etc/l7-filter/protocols\n"
+           "-m mask\t\tOnly pay look at and set the given bits of marks\n"
+           "-c\t\tClobber existing marks instead of passing them unmodified\n"
+           "-d\t\tAllow configurations that are probably ill-advised\n"

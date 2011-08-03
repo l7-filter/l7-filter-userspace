@@ -1,0 +1,21 @@
+diff -ru l7-filter-userspace-0.10/l7-filter.cpp l7-filter-userspace-0.10-quiet/l7-filter.cpp
+--- l7-filter-userspace-0.10/l7-filter.cpp	2008-09-27 03:14:14.000000000 -0400
++++ l7-filter-userspace-0.10-quiet/l7-filter.cpp	2008-12-18 16:08:55.000000000 -0500
+@@ -116,7 +116,7 @@
+ 
+ static void daemonize(void)
+ {
+-  cout << "Running as a daemon.  Goodbye.\n";
++  //cout << "Running as a daemon.  Goodbye.\n";
+ 
+   int ret = daemon(0, 0);
+ 
+@@ -360,7 +360,7 @@
+ 
+   handle_cmdline(qnum, conffilename, argc, argv);
+ 
+-  check_requirements();
++  //check_requirements();
+ 
+   signal(SIGINT, handle_sigint);
+   signal(SIGTERM, handle_sigterm);
